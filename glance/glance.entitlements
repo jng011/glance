@@ -2,10 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)com.jng011.irys</string>
-	</array>
+	<!--
+	  keychain-access-groups was removed deliberately.
+
+	  It requested $(AppIdentifierPrefix)com.jonathan.glance upstream, and an entitlement
+	  containing $(AppIdentifierPrefix) can only be authorised by a provisioning profile,
+	  which made a Developer ID build impossible without one.
+
+	  Removing it changes nothing at runtime. This app is not sandboxed — there is no
+	  com.apple.security.app-sandbox entitlement anywhere in the project — and a
+	  non-sandboxed app's Keychain items already default to the access group
+	  <TeamID>.<bundle id>, which is precisely what the entitlement was asking for.
+	  It would only be needed to SHARE Keychain items with a second app of ours.
+
+	  If a helper (for example a PAM module or a login item) ever needs to read the same
+	  Keychain items, add this back and register an App ID plus a Developer ID profile.
+	-->
 	<key>com.apple.security.device.camera</key>
 	<true/>
 </dict>
