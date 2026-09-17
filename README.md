@@ -61,11 +61,42 @@ Touch ID.
 
 Requires macOS 15 or later.
 
-**[Download the latest release](../../releases/latest)**, open the `.dmg`, drag Irys to
+### Download
+
+**[Download the latest release](../../releases/latest)** → open the `.dmg` → drag Irys to
 Applications.
 
 Signed with a Developer ID certificate, notarized by Apple and stapled, so it opens without a
 Gatekeeper warning.
+
+### Build from source
+
+```bash
+git clone https://github.com/jng011/irys.git
+cd irys
+```
+
+The ArcFace weights are not in the repository — at 166MB they exceed GitHub's per-file limit —
+so generate them first:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r tools/requirements.txt
+python tools/convert_arcface.py --variant w600k_r50 --precision float32
+```
+
+Then build:
+
+```bash
+xcodebuild -project glance.xcodeproj -scheme glance -configuration Release \
+  -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
+```
+
+Or open `glance.xcodeproj` in Xcode and hit Run.
+
+`--precision float32` is not optional for this backbone. At float16 the converted model agrees
+with the original to only 0.9977 — measured on both random and realistic input, so it is genuine
+precision loss rather than an artefact of the test — while float32 agrees to 1.000000.
 
 ### Permissions
 
@@ -85,9 +116,6 @@ Gatekeeper warning.
 4. **Recognition and liveness run as two independent gates.** Both must pass. Then Irys types
    the password.
 
-<p align="center">
-  <img src="docs/images/pipeline.png" alt="Pipeline: a camera frame feeds a recognition gate (detect, align, embed, compare) and a liveness gate (five cues over a rolling two-second window, two deny and three confirm). Both must pass before Irys types the password." width="900">
-</p>
 
 ### How it tells a face from a photograph
 
@@ -101,9 +129,6 @@ Five cues over a rolling ~2s window, in two roles:
 What a confirm cue's *absence* means is the entire difference between the three levels, and it
 is the most security-relevant thing in this app.
 
-<p align="center">
-  <img src="docs/images/liveness-levels.png" alt="The three liveness levels: Minimal does not require confirm cues and is unlocked by a matte print; Balanced, the default, requires them and lets them vote; Strict requires one cue to fully fire." width="900">
-</p>
 
 | Level | Confirm cues | A matte print |
 |---|---|---|
@@ -136,22 +161,7 @@ difference is the cue the whole liveness check is built on.</sub>
   blobs themselves are ungated — useless without the key — because macOS cannot show a Touch ID
   prompt at the lock screen, which is precisely where the app needs to read them.
 
-## Building
-
-The ArcFace weights are **not** in the repository — at 166MB they exceed GitHub's per-file
-limit. Generate them before the first build:
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r tools/requirements.txt
-python tools/convert_arcface.py --variant w600k_r50 --precision float32
-```
-
-`--precision float32` is required for this backbone. At float16 the converted model agrees with
-the original to only 0.9977 — measured on both random and realistic input, so it is genuine
-precision loss rather than an artefact of the test — while float32 agrees to 1.000000.
-
-Then open `glance.xcodeproj` and build, or:
+## Releasing
 
 ```bash
 tools/release.sh ~/Desktop             # build, sign, notarize, staple
