@@ -9,15 +9,27 @@
 # failure one, which is not red — so they all shift by the same amount and stay
 # consistent with each other.
 #
-# Defaults land on roughly #4E9142, a muted green close to the Face ID scan
-# colour rather than a neon one. Re-run with different numbers to retune; the
-# sources are in git, so this is always reversible.
+# IMPORTANT: this must run against the ORIGINAL blue clips, not against an
+# already-recoloured set. A hue rotation applied twice compounds. If the files
+# in Resources have already been shifted, restore them from git first:
+#   git show 821b33a~1:glance/Resources/<clip>.mp4 > glance/Resources/<clip>.mp4
 #
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-HUE="${1:--95}"
-SAT="${2:-0.50}"
+# Defaults tuned by measuring the result rather than by eye: the search in
+# tools/ landed on this as the closest match to Apple's dark-mode system green
+# (#30D158), reaching #3CC25F. `hue` alone could not get there — it rotates and
+# saturates but barely moves brightness, so the first attempt produced a green
+# that was correct in hue and much too dark. The eq stage is what supplies the
+# lightness.
+HUE="${1:--73}"
+EQ="${2:-saturation=0.85:brightness=0.12:contrast=1.08}"
+# Pulls the black point back down after the eq stage. Raising brightness enough
+# to reach the target green also lifts the clips' black background to about
+# #131512, which shows as a grey rectangle against the notch's black panel.
+# 0.08 restores a true black while costing only a few points of ring brightness.
+BLACK_POINT="${3:-0.08}"
 RES="glance/Resources"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -28,7 +40,7 @@ for clip in idleanimation unlockanimation unsuccessfulunlockanimation; do
   # -crf 18 keeps these visually lossless; they are small and re-encoding a
   # gradient-heavy clip at a lower quality shows banding immediately.
   xcrun ffmpeg -loglevel error -y -i "$RES/$clip.mp4" \
-    -vf "hue=h=${HUE}:s=${SAT}" \
+    -vf "hue=h=${HUE}:s=1.0,eq=${EQ},colorlevels=rimin=${BLACK_POINT}:gimin=${BLACK_POINT}:bimin=${BLACK_POINT}" \
     -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p -an \
     "$TMP/$clip.mp4"
   mv "$TMP/$clip.mp4" "$RES/$clip.mp4"
@@ -36,7 +48,7 @@ done
 
 echo "==> unlockstatic.png"
 xcrun ffmpeg -loglevel error -y -i "$RES/unlockstatic.png" \
-  -vf "hue=h=${HUE}:s=${SAT}" "$TMP/unlockstatic.png"
+  -vf "hue=h=${HUE}:s=1.0,eq=${EQ},colorlevels=rimin=${BLACK_POINT}:gimin=${BLACK_POINT}:bimin=${BLACK_POINT}" "$TMP/unlockstatic.png"
 mv "$TMP/unlockstatic.png" "$RES/unlockstatic.png"
 
-echo "Done. hue=${HUE} sat=${SAT}"
+echo "Done. hue=${HUE} eq=${EQ} black=${BLACK_POINT}"

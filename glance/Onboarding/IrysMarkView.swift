@@ -45,8 +45,8 @@ struct IrysMarkView: View {
                     LinearGradient(
                         // Matches the app accent and the recoloured scan animations;
                         // the mark was indigo while everything around it went green.
-                        colors: [Color(red: 0.384, green: 0.659, blue: 0.318),
-                                 Color(red: 0.145, green: 0.286, blue: 0.122)],
+                        colors: [Color(red: 0.188, green: 0.820, blue: 0.345),
+                                 Color(red: 0.063, green: 0.310, blue: 0.129)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
