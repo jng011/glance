@@ -86,7 +86,7 @@ tell application "Finder"
     -- Assign-and-verify is the only reliable way to know it actually applied.
     --
     -- 620x420 is the background's size; the extra 28pt of height is the title
-    -- bar, which `bounds` includes and the content area does not.
+    -- bar, which 'bounds' includes and the content area does not.
     set targetBounds to {200, 140, 820, 588}
     repeat 8 times
       set the bounds of container window to targetBounds
@@ -96,7 +96,7 @@ tell application "Finder"
 
     update without registering applications
     delay 1
-    -- Assign once more after the update: `update` itself can reflow the window.
+    -- Assign once more after the update: 'update' itself can reflow the window.
     set the bounds of container window to targetBounds
     delay 0.6
     close

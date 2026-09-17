@@ -20,11 +20,21 @@ enum ScanMedia: Equatable {
 
     var videoResourceName: String? {
         switch self {
-        case .idle: return nil
+        // idleanimation.mp4 shipped in Resources but the overlay never played it —
+        // it was only wired into onboarding. So while the app was actually scanning
+        // the notch showed unlockstatic.png, a single still frame: the camera light
+        // came on and nothing moved, and the only animation a user ever saw was the
+        // resolved one, after the attempt had already finished.
+        case .idle: return "idleanimation"
         case .success: return "unlockanimation"
         case .failure: return "unsuccessfulunlockanimation"
         }
     }
+
+    /// Whether the clip loops. Only the searching state does — the other two end
+    /// on a resolved frame that is meant to be held, which is why
+    /// `actionAtItemEnd` is `.none` for them.
+    var loops: Bool { self == .idle }
 }
 
 struct ScanAnimationView: NSViewRepresentable {
@@ -48,6 +58,9 @@ final class ScanAnimationHostView: NSView {
     private var currentMedia: ScanMedia?
     private var readyObservation: NSKeyValueObservation?
     private var fallbackRevealWorkItem: DispatchWorkItem?
+    /// Restarts the searching clip when it reaches the end. Removed on teardown —
+    /// leaving it attached would keep restarting a player that has been replaced.
+    private var loopObserver: NSObjectProtocol?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -100,8 +113,19 @@ final class ScanAnimationHostView: NSView {
         let newPlayer = AVPlayer(url: url)
         // This can play at the lock screen — never make noise.
         newPlayer.isMuted = true
-        // Leaves the player paused on its final frame rather than rewinding.
-        newPlayer.actionAtItemEnd = .none
+        // Searching loops; the resolved states hold their final frame rather than
+        // rewinding, which is what `.none` does.
+        newPlayer.actionAtItemEnd = media.loops ? .none : .none
+        if media.loops {
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: newPlayer.currentItem,
+                queue: .main
+            ) { [weak newPlayer] _ in
+                newPlayer?.seek(to: .zero)
+                newPlayer?.play()
+            }
+        }
 
         playerLayer.player = newPlayer
         player = newPlayer
@@ -138,6 +162,10 @@ final class ScanAnimationHostView: NSView {
 
     private func teardownPlayer() {
         readyObservation = nil
+        if let loopObserver {
+            NotificationCenter.default.removeObserver(loopObserver)
+            self.loopObserver = nil
+        }
         fallbackRevealWorkItem?.cancel()
         player?.pause()
         player = nil
