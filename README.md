@@ -35,8 +35,9 @@ https://github.com/user-attachments/assets/77438826-80a9-4ab2-9fc3-42407a2d0adb
 >   the frame unlocks the Mac in a few seconds. This has been reproduced on real hardware, and it
 >   is why Minimal is not the default and warns you when you select it.
 > - Glance does not reliably defeat a video of you
-> - Holding perfectly still can stall a scan on Balanced and Strict — below roughly 12 degrees of
->   head rotation the confirm cues have no parallax to measure and abstain rather than guess
+> - Holding perfectly still can stall a scan on Balanced and Strict — with no head rotation the
+>   confirm cues have no parallax to measure and abstain rather than guess. Balanced needs about
+>   9 degrees of head movement, Strict about 18
 > - macOS has no API that lets a third-party app authorize a login, so Glance unlocks by typing
 >   your stored password on the lock screen
 > 
@@ -135,7 +136,7 @@ levels, and it is the most security-relevant thing in this app:
 | Level | Deny cues | Confirm cues | A matte print |
 |---|---|---|---|
 | **Minimal** | run | not required — absence is never a failure | **unlocks the Mac** |
-| **Balanced** *(default)* | run | required, but they vote: each cue's reading is normalised against its own firing threshold and summed, so several partly-convinced cues can pass together | refused |
+| **Balanced** *(default)* | run | required, but they vote: each cue's reading is normalised against its own firing threshold and summed, so several partly-convinced cues can pass together. Because no single cue decides alone, Balanced can also read at half the head rotation the others need | refused |
 | **Strict** | run | required, and one cue must fully fire on its own | refused |
 
 A deny cue firing fails the scan in every level, and overrides any confirmation already reached.

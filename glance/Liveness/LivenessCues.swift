@@ -174,12 +174,33 @@ struct LivenessTuning: Equatable {
     /// room on both sides. Retune from Face Lab, and re-run `tools/liveness_selftest.swift`.
     var mediumConfirmScore: Float = 0.55
 
+    /// Minimum yaw range, in degrees, the geometry-based confirm cues need before they
+    /// read at all. Below this the predicted landmark displacement is sub-pixel, so a
+    /// reading would be measuring Vision's noise rather than the user's head.
+    ///
+    /// Balanced runs a lower gate than Minimal and Strict. It can afford to, because it
+    /// never trusts one cue on its own — a weak reading contributes a little to a sum
+    /// instead of deciding by itself, and confidence still ramps from wherever the gate
+    /// sits, so a smaller rotation is worth proportionally less.
+    var minYawRangeDegrees: CGFloat = 12
+    /// 6, not lower. Swept in `tools/liveness_selftest.swift`: at a 6-degree gate a live
+    /// head scores 0.86 once its yaw range reaches 9 degrees — half the rotation the
+    /// 12-degree gate demands — while every photo sequence stays at or below 0.29 against
+    /// the 0.55 threshold. At a 4-degree gate the planar-wobble attack (a flat photo moved
+    /// in a pure homography, the hardest 2D spoof here) reaches 0.465, which is 85% of the
+    /// way in. That is why this is 6 and not 4.
+    var mediumMinYawRangeDegrees: CGFloat = 6
+
     /// Medium waits at least this long before it can pass, for the same reason Light does:
     /// the deny cues need frames on the board before anything is allowed to confirm. Higher
     /// than Light's because the confirm cues read a window, not a single frame.
     var mediumModeMinimumFrames: Int = 6
 
     nonisolated static let `default` = LivenessTuning()
+
+    nonisolated func minYawRange(for mode: LivenessMode) -> CGFloat {
+        mode == .medium ? mediumMinYawRangeDegrees : minYawRangeDegrees
+    }
 
     /// The level at which a cue is saying *nothing*, which is not always zero.
     /// `depthPose` reports a remapped correlation `(r + 1) / 2`, so its "no evidence"
@@ -384,13 +405,16 @@ struct LivenessEvaluator {
 /// the latest frame (per-frame appearance); confirm cues read the whole window (cross-frame motion).
 nonisolated enum LivenessCues {
     nonisolated static func readings(
-        window: [LivenessFrame], geometry: GeometryLivenessResult
+        window: [LivenessFrame], geometry: GeometryLivenessResult,
+        minYawRangeDegrees: CGFloat = 12
     ) -> [LivenessCue: CueReading] {
         [
             .glossGlare: glossGlare(window.last),
             .deviceDetected: deviceDetected(window.last),
             .flatVs3D: geometry.planarReading,
-            .depthPose: LivenessScoring.poseDepthConsistency(window),
+            .depthPose: LivenessScoring.poseDepthConsistency(
+                window, minYawRangeDegrees: minYawRangeDegrees
+            ),
             .blink: LivenessScoring.blinkDynamics(window),
         ]
     }

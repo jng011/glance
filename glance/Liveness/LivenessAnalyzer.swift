@@ -50,10 +50,17 @@ final class LivenessAnalyzer {
         evaluator.tuning = tuningProvider()
         evaluator.enabledCues = enabledCuesProvider()
 
-        let geometry = GeometryLiveness.evaluate(frames)
+        // The geometry gate follows the mode: see `LivenessTuning.minYawRangeDegrees`.
+        let minYaw = evaluator.tuning.minYawRange(for: evaluator.mode)
+        var geometryTuning = GeometryTuning.default
+        geometryTuning.minYawRangeDegrees = minYaw
+
+        let geometry = GeometryLiveness.evaluate(frames, tuning: geometryTuning)
         lastGeometry = geometry
 
-        let readings = LivenessCues.readings(window: frames, geometry: geometry)
+        let readings = LivenessCues.readings(
+            window: frames, geometry: geometry, minYawRangeDegrees: minYaw
+        )
         let snapshot = evaluator.observe(readings)
         lastSnapshot = snapshot
         return snapshot

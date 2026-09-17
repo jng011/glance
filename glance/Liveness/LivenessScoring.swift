@@ -68,7 +68,9 @@ nonisolated enum LivenessScoring {
     /// Correlates nose-offset-from-eye-midline against tan(yaw): tracks yaw on a real face,
     /// stays constant on a flat presentation. Abstains at small yaw ranges where the
     /// predicted displacement is below Vision's landmark noise floor.
-    static func poseDepthConsistency(_ window: [LivenessFrame]) -> CueReading {
+    static func poseDepthConsistency(
+        _ window: [LivenessFrame], minYawRangeDegrees: CGFloat = 12
+    ) -> CueReading {
         let pairs = window.compactMap { frame -> (CGFloat, CGFloat)? in
             guard let offset = frame.noseOffsetRatio, let yaw = frame.yaw, frame.hasReliableLandmarks else { return nil }
             return (offset, CGFloat(tan(yaw)))
@@ -80,7 +82,11 @@ nonisolated enum LivenessScoring {
         let yawRange = abs(atan(maxYaw) - atan(minYaw))
         // Below ~12 degrees the predicted displacement is sub-pixel — matches
         // `GeometryTuning.minYawRangeDegrees`, which gates on the same underlying limit.
-        let minMeasurableRange: CGFloat = 12 * .pi / 180
+        // Parameterised so Balanced can run a lower gate: it sums partial evidence across
+        // cues rather than trusting any one of them, so a weak reading is allowed to be
+        // worth a little instead of nothing. Confidence still ramps from wherever the
+        // gate sits, so a smaller rotation earns proportionally less trust.
+        let minMeasurableRange: CGFloat = minYawRangeDegrees * .pi / 180
         guard yawRange > minMeasurableRange else { return .none }
 
         guard let correlation = pearsonCorrelation(pairs.map(\.0), pairs.map(\.1)) else { return .none }

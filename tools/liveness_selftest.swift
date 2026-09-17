@@ -219,7 +219,9 @@ private func generateStillPlanarSequence(frameCount: Int, noiseStd: CGFloat, see
 /// shifts with yaw — plus small independent non-rigid motion on the
 /// flexible regions only (a live face's soft tissue moving on its own),
 /// plus the same per-point noise the planar generator gets.
-private func generateLiveSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt64) -> [LivenessFrame] {
+/// `yawAmplitude` is the peak of the yaw sinusoid, so the total observed yaw *range*
+/// is about twice it — the gate in `LivenessTuning.minYawRangeDegrees` is on the range.
+private func generateLiveSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt64, yawAmplitude: CGFloat = 0.18) -> [LivenessFrame] {
     var rng = SplitMix64(seed: seed)
     let template = baseTemplate()
     let depths = depthTemplate()
@@ -229,7 +231,7 @@ private func generateLiveSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt
         let t = Double(i) / Double(max(frameCount - 1, 1))
         // A few degrees of passive rotation — plausible for someone just
         // sitting normally, not deliberately posing.
-        let yaw = CGFloat(0.18 * sin(t * 2 * .pi * 0.6))
+        let yaw = yawAmplitude * CGFloat(sin(t * 2 * .pi * 0.6))
 
         var landmarks: [LandmarkPoint] = []
         for region in LandmarkRegion.allCases {
@@ -291,7 +293,7 @@ private func generateLiveSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt
 /// with a real focal length, so frame-to-frame motion is a true
 /// homography. This is the attack a 4-DOF similarity-transform fit
 /// cannot reject, and the one geometry liveness is supposed to catch.
-private func generateTiltedPhotoSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt64) -> [LivenessFrame] {
+private func generateTiltedPhotoSequence(frameCount: Int, noiseStd: CGFloat, seed: UInt64, yawAmplitude: CGFloat = 0.18) -> [LivenessFrame] {
     var rng = SplitMix64(seed: seed)
     let template = baseTemplate()
     let focal: CGFloat = 400
@@ -299,7 +301,7 @@ private func generateTiltedPhotoSequence(frameCount: Int, noiseStd: CGFloat, see
 
     for i in 0..<frameCount {
         let t = Double(i) / Double(max(frameCount - 1, 1))
-        let yaw = CGFloat(0.18 * sin(t * 2 * .pi * 0.55))
+        let yaw = yawAmplitude * CGFloat(sin(t * 2 * .pi * 0.55))
         let cosY = cos(yaw), sinY = sin(yaw)
 
         var landmarks: [LandmarkPoint] = []
@@ -383,6 +385,7 @@ struct LivenessSelfTest {
         runGeometryTests()
         runDecisionModelTests()
         runMediumModeTests()
+        runYawGateTests()
         runAbstentionTests()
         print("\nAll liveness self-tests passed.")
     }
@@ -484,16 +487,25 @@ struct LivenessSelfTest {
     private static let skinGlare = GlareSample(cropPixelWidth: 140, specularFraction: 0.004, specularClusterRatio: 0.15)
     private static let screenGlare = GlareSample(cropPixelWidth: 140, specularFraction: 0.09, specularClusterRatio: 0.75)
 
+    /// Mirrors `LivenessAnalyzer.observe` exactly, including deriving the geometry gate
+    /// from the mode — if these two drift apart the self-test stops testing the app.
     private static func evaluate(
-        _ frames: [LivenessFrame], mode: LivenessMode, cues: Set<LivenessCue> = Set(LivenessCue.allCases)
+        _ frames: [LivenessFrame], mode: LivenessMode, cues: Set<LivenessCue> = Set(LivenessCue.allCases),
+        tuning: LivenessTuning = .default
     ) -> LivenessSnapshot {
-        var evaluator = LivenessEvaluator(mode: mode, tuning: .default, enabledCues: cues)
+        var evaluator = LivenessEvaluator(mode: mode, tuning: tuning, enabledCues: cues)
+        var geometryTuning = GeometryTuning.default
+        geometryTuning.minYawRangeDegrees = tuning.minYawRange(for: mode)
         var window: [LivenessFrame] = []
         var snapshot = LivenessSnapshot.empty
         for frame in frames {
             window.append(frame)
             window.removeAll { frame.timestamp.timeIntervalSince($0.timestamp) > 2.0 }
-            snapshot = evaluator.observe(LivenessCues.readings(window: window, geometry: GeometryLiveness.evaluate(window)))
+            snapshot = evaluator.observe(LivenessCues.readings(
+                window: window,
+                geometry: GeometryLiveness.evaluate(window, tuning: geometryTuning),
+                minYawRangeDegrees: geometryTuning.minYawRangeDegrees
+            ))
         }
         return snapshot
     }
@@ -680,6 +692,89 @@ struct LivenessSelfTest {
             "FAIL: a zero-correlation depth/pose reading contributed \(neutral) evidence; it must contribute nothing."
         )
         print("PASS: a zero-correlation depth/pose reading contributes no confirm evidence.")
+    }
+
+    // MARK: - The Balanced yaw gate
+
+    /// Yaw amplitude producing a given total yaw *range* in degrees.
+    private static func amplitude(forRange degrees: CGFloat) -> CGFloat {
+        (degrees / 2) * .pi / 180
+    }
+
+    /// Balanced runs a lower geometry gate than Minimal and Strict. These tests pin both
+    /// halves of that trade: that it actually buys the user something, and that it does
+    /// not buy an attacker anything.
+    private static func runYawGateTests() {
+        print("")
+        let tuning = LivenessTuning.default
+        let need = tuning.mediumConfirmScore
+
+        // The point of lowering the gate: a head that moves a little, not a lot.
+        // 9 degrees of total yaw range is below Strict's 12-degree gate entirely.
+        let smallTurn = generateLiveSequence(
+            frameCount: 40, noiseStd: 1.0, seed: 2, yawAmplitude: amplitude(forRange: 9)
+        )
+        let balanced = evaluate(smallTurn, mode: .medium)
+        let strict = evaluate(smallTurn, mode: .heavy)
+        print(String(format: "Live head, 9deg yaw range: Balanced evidence %.2f (needs %.2f)",
+                     balanced.confirmEvidenceTotal, need))
+        precondition(
+            balanced.decision.isConfirmed,
+            "FAIL: a live head turning 9 degrees should pass Balanced, got \(balanced.decision)."
+        )
+        precondition(
+            strict.decision == .pending,
+            "FAIL: the premise of the lowered gate is that Strict cannot see a 9-degree turn; "
+            + "it returned \(strict.decision), so this test no longer measures anything."
+        )
+        print("PASS: Balanced confirms a 9-degree head turn that Strict cannot see at all.")
+
+        // And the other half: nothing flat gets in at the lowered gate. The planar wobble
+        // is the one that matters — a flat photo moved in a pure homography, which a
+        // similarity-transform fit cannot reject. At a 4-degree gate it reaches 0.465
+        // against this 0.55 threshold, which is why the shipped gate is 6.
+        let spoofs: [(String, [LivenessFrame])] = [
+            ("still photo",   generateStillPlanarSequence(frameCount: 40, noiseStd: 1.0, seed: 0)),
+            ("wobble photo",  generatePlanarSequence(frameCount: 40, noiseStd: 1.0, seed: 1)),
+            ("tilted photo",  generateTiltedPhotoSequence(frameCount: 40, noiseStd: 1.0, seed: 4)),
+            ("tilted photo, small turn", generateTiltedPhotoSequence(
+                frameCount: 40, noiseStd: 1.0, seed: 4, yawAmplitude: amplitude(forRange: 9))),
+            ("tilted photo, big turn", generateTiltedPhotoSequence(
+                frameCount: 40, noiseStd: 1.0, seed: 4, yawAmplitude: amplitude(forRange: 22))),
+        ]
+        var worst: Float = 0
+        for (label, frames) in spoofs {
+            let snapshot = evaluate(frames, mode: .medium)
+            worst = max(worst, snapshot.confirmEvidenceTotal)
+            precondition(
+                !snapshot.decision.isConfirmed,
+                "FAIL: \(label) passed Balanced at the lowered gate, evidence \(snapshot.confirmEvidenceTotal)."
+            )
+        }
+        // Not just "below the line" — below it with room, so ordinary retuning of one cue
+        // cannot quietly walk a spoof over the threshold.
+        precondition(
+            worst <= need * 0.6,
+            "FAIL: the strongest spoof reached \(worst) against a \(need) threshold — under the "
+            + "line but with too little margin to trust. Raise mediumMinYawRangeDegrees."
+        )
+        print(String(format: "PASS: no flat presentation passes the lowered gate; worst reached %.2f of a %.2f threshold.", worst, need))
+
+        // Guard the gate itself. Lowering it is exactly the change that would reintroduce
+        // the wobble attack, and it would do so silently.
+        precondition(
+            tuning.mediumMinYawRangeDegrees >= 6,
+            "FAIL: mediumMinYawRangeDegrees is \(tuning.mediumMinYawRangeDegrees). At 4 degrees the "
+            + "planar-wobble attack measured 0.465 against a 0.55 threshold. Re-run the sweep before lowering this."
+        )
+        print("PASS: the Balanced yaw gate has not been lowered past its swept safe value.")
+
+        // Minimal and Strict must keep the original gate — this change is scoped to Balanced.
+        precondition(
+            tuning.minYawRange(for: .light) == 12 && tuning.minYawRange(for: .heavy) == 12,
+            "FAIL: the lowered gate leaked into Minimal or Strict; it is meant to apply to Balanced only."
+        )
+        print("PASS: the lowered gate applies to Balanced only.")
     }
 
     // MARK: - Abstention
