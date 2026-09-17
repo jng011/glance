@@ -88,7 +88,7 @@ def locate_or_download_onnx(variant: str, explicit_path: str | None) -> Path:
     return matches[0]
 
 
-def convert_to_coreml(onnx_path: Path, output_path: Path) -> None:
+def convert_to_coreml(onnx_path: Path, output_path: Path, variant: str, precision: str) -> None:
     import numpy as np
     import onnx
     import coremltools as ct
@@ -121,17 +121,14 @@ def convert_to_coreml(onnx_path: Path, output_path: Path) -> None:
         ],
         outputs=[ct.TensorType(name="embedding")],
         minimum_deployment_target=ct.target.macOS14,
-        compute_precision=ct.precision.FLOAT16,
+        compute_precision=ct.precision.FLOAT32 if precision == "float32" else ct.precision.FLOAT16,
         compute_units=ct.ComputeUnit.ALL,
     )
 
-    mlmodel.short_description = "ArcFace (w600k_mbf) face embedding — 512-d, on-device"
+    mlmodel.short_description = f"ArcFace ({variant}, {precision}) face embedding — 512-d, on-device"
     mlmodel.input_description["input_image"] = "112x112 RGB aligned face crop"
     mlmodel.output_description["embedding"] = "512-float embedding (not L2-normalized)"
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    mlmodel.save(str(output_path))
-    print(f"Saved {output_path}")
     return mlmodel, onnx_path
 
 
@@ -146,30 +143,47 @@ def verify_parity(mlmodel, onnx_path: Path) -> None:
     import onnxruntime as ort
     from PIL import Image
 
-    print("\nVerifying ONNX <-> Core ML numerical parity on random input...")
-    rng = np.random.default_rng(0)
-    pixels = rng.integers(0, 256, size=(112, 112, 3), dtype=np.uint8)
-
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     onnx_input_name = sess.get_inputs()[0].name
-    chw = pixels.astype(np.float32).transpose(2, 0, 1)[None]
-    normalized = (chw - 127.5) / 127.5
-    onnx_out = sess.run(None, {onnx_input_name: normalized})[0].flatten()
 
-    pil_image = Image.fromarray(pixels, mode="RGB")
-    prediction = mlmodel.predict({"input_image": pil_image})
-    coreml_out = np.array(prediction["embedding"]).flatten()
+    def agreement(pixels: "np.ndarray") -> float:
+        chw = pixels.astype(np.float32).transpose(2, 0, 1)[None]
+        onnx_out = sess.run(None, {onnx_input_name: (chw - 127.5) / 127.5})[0].flatten()
+        coreml_out = np.array(
+            mlmodel.predict({"input_image": Image.fromarray(pixels, mode="RGB")})["embedding"]
+        ).flatten()
+        if onnx_out.shape != (512,) or coreml_out.shape != (512,):
+            fail(f"Unexpected output shape: onnx={onnx_out.shape}, coreml={coreml_out.shape} (expected (512,))")
+        return float(np.dot(onnx_out, coreml_out) / (np.linalg.norm(onnx_out) * np.linalg.norm(coreml_out)))
 
-    if onnx_out.shape != (512,) or coreml_out.shape != (512,):
-        fail(f"Unexpected output shape: onnx={onnx_out.shape}, coreml={coreml_out.shape} (expected (512,))")
+    rng = np.random.default_rng(0)
 
-    cosine = float(np.dot(onnx_out, coreml_out) / (np.linalg.norm(onnx_out) * np.linalg.norm(coreml_out)))
-    print(f"ONNX vs Core ML cosine similarity: {cosine:.6f}  (expect > 0.999)")
-    if cosine < 0.999:
+    # Uniform noise. Deliberately the worst case — it is nothing like a face,
+    # so the network is operating far outside its training distribution and
+    # numerical error is at its largest. This stays the gate.
+    noise_cos = agreement(rng.integers(0, 256, size=(112, 112, 3), dtype=np.uint8))
+
+    # A smooth, low-frequency image at face scale. Still not a face, but much
+    # closer to the statistics of one than uniform noise, and therefore a
+    # better estimate of the error the app will actually see.
+    yy, xx = np.mgrid[0:112, 0:112] / 111.0
+    smooth = np.stack([
+        0.45 + 0.35 * np.sin(3.0 * xx + 0.7) * np.cos(2.2 * yy),
+        0.50 + 0.30 * np.cos(2.4 * xx) * np.sin(2.9 * yy + 1.1),
+        0.40 + 0.25 * np.sin(2.0 * xx + 2.0) * np.cos(3.3 * yy),
+    ], axis=-1)
+    smooth_cos = agreement(np.clip(smooth * 255, 0, 255).astype(np.uint8))
+
+    print(f"  uniform noise (worst case): {noise_cos:.6f}")
+    print(f"  smooth face-scale input:    {smooth_cos:.6f}")
+    if noise_cos < 0.999:
         fail(
-            "Parity check failed — the converted model disagrees with the original. "
-            "Most likely cause: preprocessing mismatch (channel order RGB vs BGR, or "
-            "scale/bias). Do not use this model until this passes."
+            f"Parity check failed: {noise_cos:.6f} on uniform noise, below the 0.999 gate.\n"
+            "  A cosine this HIGH is not a preprocessing bug — a channel-order or scale/bias\n"
+            "  mistake lands nearer 0.3-0.7. Above ~0.99 the cause is almost always numerical\n"
+            "  precision accumulating through the network, which hurts deeper backbones such as\n"
+            "  w600k_r50 far more than w600k_mbf. Re-run with --precision float32.\n"
+            "  Nothing has been written to the output path."
         )
     print("Parity check passed. The conversion is numerically correct.")
 
@@ -180,13 +194,25 @@ def main() -> None:
     parser.add_argument("--onnx-path", default=None, help="Skip auto-download; use this local .onnx file instead.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Output .mlpackage path.")
     parser.add_argument("--skip-verify", action="store_true", help="Skip the ONNX/Core ML parity check.")
+    parser.add_argument(
+        "--precision", choices=["float16", "float32"], default="float16",
+        help="Core ML compute precision. float16 halves the file; float32 is more faithful to "
+             "the original weights and is usually needed for the deeper w600k_r50 backbone.",
+    )
     args = parser.parse_args()
 
+    output_path = Path(args.output)
     onnx_path = locate_or_download_onnx(args.variant, args.onnx_path)
-    mlmodel, onnx_path = convert_to_coreml(onnx_path, Path(args.output))
+    mlmodel, onnx_path = convert_to_coreml(onnx_path, output_path, args.variant, args.precision)
 
     if not args.skip_verify:
         verify_parity(mlmodel, onnx_path)
+
+    # Written only once the parity check has passed, so a failed conversion can
+    # never leave an unusable model sitting in the repository.
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    mlmodel.save(str(output_path))
+    print(f"Saved {output_path}")
 
     print(f"\nDone. Model ready at: {args.output}")
     print("Next: add this file to the Xcode project (glance/Models/ArcFace.mlpackage) if not auto-picked-up,")

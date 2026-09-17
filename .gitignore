@@ -17,3 +17,16 @@ __pycache__/
 
 # Local release notes
 RELEASING.md
+
+# ArcFace weights. The w600k_r50 model is 166MB, over GitHub's 100MB per-file
+# limit, and Git LFS cannot be used here: GitHub bills a fork's LFS storage to
+# the parent repository and therefore refuses new LFS objects on a public fork
+# ("can not upload new objects to public fork"). So the weights are not in the
+# repository. Regenerate them with:
+#
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r tools/requirements.txt
+#   python tools/convert_arcface.py --variant w600k_r50 --precision float32
+#
+# --precision float32 is required for this backbone; see tools/convert_arcface.py.
+glance/Models/ArcFace.mlpackage/Data/com.apple.CoreML/weights/*.bin
