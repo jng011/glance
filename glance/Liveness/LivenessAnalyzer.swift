@@ -14,7 +14,7 @@ final class LivenessAnalyzer {
     private let windowDuration: TimeInterval
 
     /// Read fresh on every `observe()`, not captured at init, so a mid-scan Settings change takes effect immediately.
-    var modeProvider: () -> LivenessMode = { .light }
+    var modeProvider: () -> LivenessMode = { .recommended }
     var tuningProvider: () -> LivenessTuning = { .default }
     /// Face Lab can switch individual cues off to isolate one; the unlock
     /// path leaves this at "all enabled."
@@ -50,10 +50,17 @@ final class LivenessAnalyzer {
         evaluator.tuning = tuningProvider()
         evaluator.enabledCues = enabledCuesProvider()
 
-        let geometry = GeometryLiveness.evaluate(frames)
+        // The geometry gate follows the mode: see `LivenessTuning.minYawRangeDegrees`.
+        let minYaw = evaluator.tuning.minYawRange(for: evaluator.mode)
+        var geometryTuning = GeometryTuning.default
+        geometryTuning.minYawRangeDegrees = minYaw
+
+        let geometry = GeometryLiveness.evaluate(frames, tuning: geometryTuning)
         lastGeometry = geometry
 
-        let readings = LivenessCues.readings(window: frames, geometry: geometry)
+        let readings = LivenessCues.readings(
+            window: frames, geometry: geometry, minYawRangeDegrees: minYaw
+        )
         let snapshot = evaluator.observe(readings)
         lastSnapshot = snapshot
         return snapshot

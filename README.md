@@ -30,8 +30,14 @@ https://github.com/user-attachments/assets/77438826-80a9-4ab2-9fc3-42407a2d0adb
 > MacBooks don't come equipped with the depth sensors that make iPhone FaceID trustworthy and secure. An
 > iPhone builds a 3D map of your face; a MacBook webcam sees a flat 2D image. That means:
 > 
-> - Glance defeats, with reasonable confidence, a printed photo and a photo on a phone screen (heavy liveness detection must be turned on)
+> - On **Balanced** (the default) or **Strict**, Glance defeats a printed photo and a photo on a
+>   phone screen. On **Minimal** it does not: a matte print held close enough that its edges leave
+>   the frame unlocks the Mac in a few seconds. This has been reproduced on real hardware, and it
+>   is why Minimal is not the default and warns you when you select it.
 > - Glance does not reliably defeat a video of you
+> - Holding perfectly still can stall a scan on Balanced and Strict — with no head rotation the
+>   confirm cues have no parallax to measure and abstain rather than guess. Balanced needs about
+>   9 degrees of head movement, Strict about 18
 > - macOS has no API that lets a third-party app authorize a login, so Glance unlocks by typing
 >   your stored password on the lock screen
 > 
@@ -72,7 +78,7 @@ Open the `.dmg` file and drag Glance to `/Applications`, then open it.
 |---|---|
 | **Face unlock** | Triggers on wake, on lock, or on pressing space at the lock screen. Pick any combination. |
 | **Multiple identities** | Enroll several people, or several versions of yourself — with glasses, a beard, different lighting. Toggle any of them off without deleting. |
-| **Liveness checks** | Watches for the motion and reflections that separate a real face from a photo. *Light* or *Heavy* strictness, or off. |
+| **Liveness checks** | Watches for the motion and reflections that separate a real face from a photo. *Minimal*, *Balanced* (default) or *Strict*, or off. |
 | **Notch UI** | A closed pill that expands into a scan animation with success and failure states. Hover to retry — or turn animations off entirely and Glance stays invisible. |
 | **Camera & display** | Choose which camera to use, including different cameras for the built-in display vs. an external monitor. |
 | **Auto-locking sessions** | The Touch ID session re-locks itself after an idle period you choose, so an unattended Mac doesn't stay authorized forever. |
@@ -122,10 +128,22 @@ Five independent cues over a rolling ~2s window, in two roles:
 - **Deny cues** are evidence of a spoof — screen glare, or a device-shaped rectangle framing the
 face. Either one fails the scan outright and overrides anything else.
 - **Confirm cues** are evidence of a real face — flat-vs-3D landmark geometry, nose parallax
-across head turns, blinks. Any one is enough, and their absence is never a failure, since a
-live person can sit still and not blink.
+across head turns, blinks.
 
-Light detection only include deny cues. Heavy detection includes both deny and confirm cues.
+What a confirm cue's *absence* means is the whole difference between the three strictness
+levels, and it is the most security-relevant thing in this app:
+
+| Level | Deny cues | Confirm cues | A matte print |
+|---|---|---|---|
+| **Minimal** | run | not required — absence is never a failure | **unlocks the Mac** |
+| **Balanced** *(default)* | run | required, but they vote: each cue's reading is normalised against its own firing threshold and summed, so several partly-convinced cues can pass together. Because no single cue decides alone, Balanced can also read at half the head rotation the others need | refused |
+| **Strict** | run | required, and one cue must fully fire on its own | refused |
+
+A deny cue firing fails the scan in every level, and overrides any confirmation already reached.
+
+Minimal is offered because it never blocks a user who sits still. It is not the default, and
+selecting it asks you to confirm first. Balanced and Strict can both stall on a user who holds
+perfectly still and does not blink — the confirm cues need some head movement to measure against.
 
 ### Face Lab
 

@@ -780,7 +780,7 @@ struct LivenessModePicker: View {
     var body: some View {
         SettingsLabeledOptionRow(
             title: "Strength",
-            subtitle: "Light includes basic protection. Heavy requires you to blink or slightly move your head."
+            subtitle: "Balanced is recommended. Strict requires you to blink or clearly turn your head."
         ) {
             ForEach(LivenessMode.allCases) { mode in
                 SettingsOptionTile(
@@ -800,11 +800,12 @@ struct LivenessModePicker: View {
         .opacity(isEnabled ? 1 : 0.4)
     }
 
-    /// A half-filled shield for Light (it only screens *out* spoofs) versus
-    /// a checked one for Heavy (it also demands positive proof of life).
+    /// Brightness ramp as a stand-in for scrutiny: Minimal only screens *out* spoofs,
+    /// Strict also demands positive proof of life.
     private func iconName(for mode: LivenessMode) -> String {
         switch mode {
         case .light: return "sun.min.fill"
+        case .medium: return "sun.horizon.fill"
         case .heavy: return "sun.max.fill"
         }
     }

@@ -262,8 +262,10 @@ final class GlanceSettings {
         // Light by default — Heavy requires a blink/pose/depth signal a
         // still, non-blinking user may never produce, while Light still
         // catches the main attack (a photo on a phone screen).
+        // Was `.light`, which a matte print defeats outright — see `LivenessMode.light`.
+        // Raw values are unchanged, so an existing explicit choice still migrates.
         livenessMode = defaults.string(forKey: Key.livenessMode)
-            .flatMap(LivenessMode.init(rawValue:)) ?? .light
+            .flatMap(LivenessMode.init(rawValue:)) ?? .recommended
         // Matches `DetectionDistanceLevel.standard` — see RecognitionSettingsPage.swift.
         minimumFaceWidth = defaults.object(forKey: Key.minimumFaceWidth) as? Float ?? 0.21
 
