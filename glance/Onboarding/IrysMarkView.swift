@@ -43,8 +43,10 @@ struct IrysMarkView: View {
             RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color(red: 0.455, green: 0.510, blue: 1.0),
-                                 Color(red: 0.180, green: 0.200, blue: 0.478)],
+                        // Matches the app accent and the recoloured scan animations;
+                        // the mark was indigo while everything around it went green.
+                        colors: [Color(red: 0.384, green: 0.659, blue: 0.318),
+                                 Color(red: 0.145, green: 0.286, blue: 0.122)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )

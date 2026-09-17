@@ -9,11 +9,15 @@
 
 import Foundation
 import CoreGraphics
+import os
 import Observation
 
 @Observable
 @MainActor
 final class FaceUnlockCoordinator {
+    /// Recognition scoring, for diagnosing rejections without a debug console.
+    nonisolated static let matchLog = Logger(subsystem: "com.jng011.irys", category: "match")
+
     private let pocController: POCController
     let lockMonitor = LockMonitor()
     let camera = CameraManager()
@@ -388,6 +392,23 @@ final class FaceUnlockCoordinator {
             // `activeIdentities`, not `identities`: someone switched off on the Your Face page stays enrolled but must not unlock.
             let scored = pipeline.score(result.embedding, against: FaceEnrollmentStore.shared.activeIdentities)
             let matched = pipeline.bestMatch(in: scored, threshold: matchThreshold)
+
+            // Log the best score against the threshold that rejected it.
+            //
+            // matchThreshold is an unvalidated constant inherited from a build that
+            // used a different backbone, and a threshold tuned for one network means
+            // nothing on another. Without this, diagnosing "it denies me every time"
+            // requires the user to go read Face Lab; with it, one lock attempt and
+            //   log show --last 5m --predicate 'subsystem == "com.jng011.irys"'
+            // says whether recognition or liveness is the one saying no.
+            // Both similarities are logged because bestMatch tests each against the
+            // threshold; logging one would hide which of them fell short.
+            if let top = scored.max(by: { $0.centroidSimilarity < $1.centroidSimilarity }) {
+                let centroid = top.centroidSimilarity
+                let maxSample = top.maxSampleSimilarity
+                let verdict = matched == nil ? "REJECT" : "ACCEPT"
+                Self.matchLog.info("match centroid=\(centroid) maxSample=\(maxSample) threshold=\(self.matchThreshold) verdict=\(verdict, privacy: .public)")
+            }
 
             if let matched {
                 consecutiveWrongFaceFrames = 0

@@ -201,7 +201,14 @@ final class OnboardingController {
     func playIntroSweepIfNeeded() {
         guard !hasPlayedIntroSweep else { return }
         hasPlayedIntroSweep = true
-        sweepWindow.presentOnce(direction: .down)
+        // Deliberately does nothing now. The full-screen sweep reads as a flashbang
+        // in a dark room — which is exactly when someone is most likely to be
+        // setting this up — and it is a bright white wash across the whole display
+        // milliseconds before the camera starts evaluating the scene.
+        //
+        // Kept as a call site rather than deleted so the intent is recorded: if a
+        // light sweep comes back it should be inside the notch panel, not
+        // full-screen, and it must not fire while the camera is scoring frames.
     }
 
     /// Who this run is enrolling. Recapture is keyed by `id` rather than name so the
@@ -661,7 +668,12 @@ final class OnboardingController {
         poseStartedAt = .now
         captureReadyAt = .now + initialCaptureDelay
         poseHoldStartedAt = nil
-        sweepWindow.present(for: self)
+        // The guided-enrollment sweep is gone with the pose queue it existed to
+        // serve. It pointed the user toward the specific pose the app was
+        // demanding next; enrollment now accepts whichever pose the head is
+        // actually in, so there is nothing to point at. It was also the brightest
+        // thing on screen during the one operation that depends on the camera
+        // metering the user's face rather than the display.
         Task { await camera.start() }
     }
 

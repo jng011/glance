@@ -8,8 +8,23 @@
 
 import SwiftUI
 
+/// Irys palette.
+///
+/// The accent was `#3499FF` — system blue in a slightly lighter hat, and the
+/// single most recognisable thing carried over from the app this forked from.
+/// Renaming everything while keeping that blue is why the result still read as
+/// the old app with new labels.
+///
+/// It is now `#4E9142`, the same green the scan animations were recoloured to,
+/// so the chrome and the thing you actually watch during an unlock agree with
+/// each other. Green also earns its place here: it is the colour a biometric
+/// scan reads as, and it is not the colour of every other Mac utility.
+///
+/// The type name is unchanged deliberately — it appears in roughly a hundred
+/// call sites, it is invisible to users, and renaming it is the change most
+/// likely to break the build for no gain.
 enum GlanceTheme {
-    private static let accentRGB = (r: 0x34 / 255.0, g: 0x99 / 255.0, b: 0xFF / 255.0)
+    private static let accentRGB = (r: 0x4E / 255.0, g: 0x91 / 255.0, b: 0x42 / 255.0)
     static let accent = Color(red: accentRGB.r, green: accentRGB.g, blue: accentRGB.b)
 
     /// White at 0, `accent` at 1.
@@ -23,9 +38,9 @@ enum GlanceTheme {
     }
     /// Accent-derived shades for the enrollment sweep, shifted so layered streaks read
     /// as one body of light rather than several flat shapes.
-    static let accentPale   = Color(red: 0xCF / 255, green: 0xE7 / 255, blue: 0xFF / 255)
-    static let accentBright = Color(red: 0x7F / 255, green: 0xC2 / 255, blue: 0xFF / 255)
-    static let accentDeep   = Color(red: 0x1F / 255, green: 0x6B / 255, blue: 0xD1 / 255)
+    static let accentPale   = Color(red: 0xD6 / 255, green: 0xEB / 255, blue: 0xC9 / 255)
+    static let accentBright = Color(red: 0x84 / 255, green: 0xC4 / 255, blue: 0x76 / 255)
+    static let accentDeep   = Color(red: 0x2E / 255, green: 0x5C / 255, blue: 0x27 / 255)
     static let surface = Color(red: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255)
     static let surfaceRaised = Color(red: 0x32 / 255, green: 0x32 / 255, blue: 0x32 / 255)
     static let panel = Color.black
@@ -33,7 +48,9 @@ enum GlanceTheme {
     static let textSecondary = Color(red: 0x94 / 255, green: 0x94 / 255, blue: 0x94 / 255)
     static let textDetail = Color(red: 0xBD / 255, green: 0xBD / 255, blue: 0xBD / 255)
     static let placeholder = Color(red: 0x2F / 255, green: 0x2F / 255, blue: 0x2F / 255)
-    static let statusGranted = Color(red: 0x30 / 255, green: 0xD1 / 255, blue: 0x58 / 255)
+    /// Deliberately brighter and more saturated than `accent`, which is now also
+    /// green: a granted state has to read as a state change, not as chrome.
+    static let statusGranted = Color(red: 0x3F / 255, green: 0xE0 / 255, blue: 0x6A / 255)
     static let statusDenied = Color(red: 0xFF / 255, green: 0x45 / 255, blue: 0x3A / 255)
 
     enum Font {

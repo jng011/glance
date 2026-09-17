@@ -78,43 +78,42 @@ osascript <<APPLESCRIPT || echo "    (Finder styling skipped — grant Automatio
 tell application "Finder"
   tell disk "$ACTUAL_VOL"
     open
+    -- Bounds FIRST, before any view options.
+    --
+    -- Setting them last seemed right (Finder restores a remembered geometry on
+    -- open, so later ought to win) and did not work: the background and icon
+    -- positions persisted into the image's .DS_Store while the window rect never
+    -- did. Finder appears to commit window geometry as part of establishing the
+    -- window, not as a later mutation, so it has to be established up front and
+    -- then left alone.
+    --
+    -- 620x420 is the background's size; the extra 28pt of height is the title
+    -- bar, which bounds includes and the content area does not.
+    set the bounds of container window to {200, 140, 820, 588}
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
+    delay 0.5
+
     set vopts to the icon view options of container window
     set arrangement of vopts to not arranged
     set icon size of vopts to 112
     set text size of vopts to 12
     set label position of vopts to bottom
     set background picture of vopts to file ".background:background.png"
+
     set position of item "Irys.app" of container window to {152, 196}
     set position of item "Applications" of container window to {468, 196}
     try
       set position of item ".background" of container window to {900, 900}
     end try
 
-    -- Set the bounds, then READ THEM BACK and retry until they take.
-    --
-    -- Finder restores a remembered window geometry for a volume of a given name
-    -- and will quietly overwrite a size set moments earlier, which is why simply
-    -- assigning bounds once left a strip of empty window beside the background.
-    -- Assign-and-verify is the only reliable way to know it actually applied.
-    --
-    -- 620x420 is the background's size; the extra 28pt of height is the title
-    -- bar, which 'bounds' includes and the content area does not.
-    set targetBounds to {200, 140, 820, 588}
-    repeat 8 times
-      set the bounds of container window to targetBounds
-      delay 0.4
-      if the bounds of container window is targetBounds then exit repeat
-    end repeat
-
+    -- Re-assert after the view options, which can reflow the window.
+    set the bounds of container window to {200, 140, 820, 588}
     update without registering applications
-    delay 1
-    -- Assign once more after the update: 'update' itself can reflow the window.
-    set the bounds of container window to targetBounds
-    delay 0.6
+    delay 2
     close
+    delay 1
   end tell
 end tell
 APPLESCRIPT
