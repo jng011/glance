@@ -387,6 +387,21 @@ final class FaceUnlockCoordinator {
                 case .pending:
                     break
                 }
+
+                // Why liveness is withholding, once per scan rather than per frame.
+                //
+                // Recognition already logs its score, and with that in place a
+                // rejection with a passing match can only be this gate — but
+                // "liveness said no" is not actionable on its own. This reports
+                // each confirm cue's latched evidence and the summed total against
+                // the threshold, which distinguishes "the user sat too still for
+                // any cue to read" from "a cue is reading and the bar is wrong".
+                if !livenessConfirmed, snapshot.frameCount % 25 == 0 {
+                    let flat = snapshot.state(for: .flatVs3D)
+                    let depth = snapshot.state(for: .depthPose)
+                    let blink = snapshot.state(for: .blink)
+                    Self.matchLog.info("liveness mode=\(snapshot.mode.title, privacy: .public) frames=\(snapshot.frameCount) evidence=\(snapshot.confirmEvidenceTotal) flat=\(flat.peakEvidence) depth=\(depth.peakEvidence) blink=\(blink.peakEvidence) yaw=\(liveness.lastGeometry.diagnosticRatios["yaw range (deg)"] ?? -1)")
+                }
             }
 
             // `activeIdentities`, not `identities`: someone switched off on the Your Face page stays enrolled but must not unlock.
