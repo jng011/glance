@@ -51,8 +51,19 @@ final class HelperClient {
         switch service.status {
         case .enabled: availability = .enabled
         case .requiresApproval: availability = .requiresApproval
-        case .notRegistered: availability = .notRegistered
-        case .notFound: availability = .unavailable("Helper is missing from the app bundle.")
+        // .notFound and .notRegistered are BOTH "not installed yet".
+        //
+        // The name suggests a missing file, and it was mapped that way at first,
+        // which hid the Install button behind an error that was never true. For a
+        // daemon, macOS reports .notFound whenever Background Task Management has
+        // no record of the item — which is exactly the state before the first
+        // registration. Confirmed in smd's log: "getEffectiveDisposition: record
+        // not found" followed by "Found status: 3", with the plist and the binary
+        // both sitting correctly in the bundle.
+        //
+        // A genuinely missing helper surfaces as a thrown error from register(),
+        // which is where it can be reported accurately.
+        case .notRegistered, .notFound: availability = .notRegistered
         @unknown default: availability = .unavailable("Unknown helper status.")
         }
     }
