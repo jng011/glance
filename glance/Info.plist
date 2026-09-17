@@ -2,10 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Upstream shipped https://tryglance.app/appcast.xml here together with their own
+	     SUPublicEDKey. Both are removed deliberately. Leaving them would point this fork's
+	     updater at someone else's release channel, and we hold no private key for theirs, so
+	     we could not sign an update for it even if we wanted to.
+	     SUPublicEDKey is absent rather than blank on purpose: with no key configured Sparkle
+	     cannot verify anything, and UpdaterController refuses to start rather than fall back
+	     to unverified updates. Restore both together, never one without the other. -->
 	<key>SUFeedURL</key>
-	<string>https://tryglance.app/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>o9uQmlzKzh7NZvFtVktVh/wqw4Ie6WshX8K8NFDweWY=</string>
+	<string>https://jng011.github.io/irys/appcast.xml</string>
 	<key>SUAutomaticallyUpdate</key>
 	<false/>
 	<key>SUEnableInstallerLauncherService</key>

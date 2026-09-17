@@ -1,6 +1,6 @@
 //
 //  UpdaterController.swift
-//  glance
+//  Irys
 //
 //  Thin wrapper around Sparkle's `SPUStandardUpdaterController`.
 //  Split into two types because Sparkle's `@objc` delegate protocols need an `NSObject` conformer, which doesn't mix with
@@ -53,14 +53,27 @@ final class UpdaterController {
         }
     }
 
-    /// Safe to call even with a placeholder `SUPublicEDKey` — `SPUStandardUpdaterController` logs and alerts on a misconfigured
-    /// Sparkle setup itself rather than throwing.
+    /// False until this fork has its own Sparkle signing key in `Info.plist`.
+    ///
+    /// Upstream's `SUPublicEDKey` was removed rather than replaced with a placeholder, because a
+    /// placeholder is indistinguishable at a glance from a real key. Absent means absent: with no
+    /// key Sparkle cannot verify a download's signature, so the updater is not started and the
+    /// UI is disabled, rather than leaving a path that could install an unverified update.
+    var isConfigured: Bool {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String else { return false }
+        return !key.isEmpty
+    }
+
+    /// No-op until `isConfigured`. Starting Sparkle without a key makes it alert the user about a
+    /// misconfigured setup, which is noise for a condition we already know about.
     func start() {
+        guard isConfigured else { return }
         controller.startUpdater()
     }
 
     /// User-initiated "Check for Updates" — shows Sparkle's standard progress UI.
     func checkForUpdates() {
+        guard isConfigured else { return }
         controller.checkForUpdates(nil)
     }
 }

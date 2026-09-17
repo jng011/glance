@@ -43,7 +43,7 @@ final class POCController {
         sessionError = nil
         do {
             try await Task.detached(priority: .userInitiated) {
-                try SecureCredentialManager.unlockSession(reason: "Authenticate to set up or use glance")
+                try SecureCredentialManager.unlockSession(reason: "Authenticate to set up or use Irys")
             }.value
             isSessionUnlocked = true
         } catch {
@@ -92,7 +92,7 @@ final class POCController {
     /// confirms the screen is actually locked.
     func injectStoredPassword(requireAuthoritativeLock: Bool = false) async {
         guard KeystrokeInjector.isAccessibilityTrusted() else {
-            statusMessage = "Accessibility not granted — open System Settings and enable glance."
+            statusMessage = "Accessibility not granted — open System Settings and enable Irys."
             return
         }
         guard SecureCredentialManager.isSessionUnlocked else {
