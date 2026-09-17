@@ -3,21 +3,24 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  keychain-access-groups was removed deliberately.
+	  keychain-access-groups is REQUIRED, and removing it breaks Touch ID unlock.
 
-	  It requested $(AppIdentifierPrefix)com.jonathan.glance upstream, and an entitlement
-	  containing $(AppIdentifierPrefix) can only be authorised by a provisioning profile,
-	  which made a Developer ID build impossible without one.
+	  It was briefly removed on the theory that a non-sandboxed app defaults to the
+	  <TeamID>.<bundle id> group anyway. That is true of the FILE-BASED keychain, and
+	  false of the one this app actually uses: KeychainManager stores the session key
+	  with SecAccessControlCreateWithFlags(..., .userPresence, ...), and an
+	  access-control-gated item lives in the DATA PROTECTION keychain, which on macOS
+	  requires the app to carry this entitlement. Without it SecItemAdd fails with
+	  errSecMissingEntitlement (-34018), surfaced in the UI as
+	  "Keychain error: A required entitlement is not present."
 
-	  Removing it changes nothing at runtime. This app is not sandboxed — there is no
-	  com.apple.security.app-sandbox entitlement anywhere in the project — and a
-	  non-sandboxed app's Keychain items already default to the access group
-	  <TeamID>.<bundle id>, which is precisely what the entitlement was asking for.
-	  It would only be needed to SHARE Keychain items with a second app of ours.
-
-	  If a helper (for example a PAM module or a login item) ever needs to read the same
-	  Keychain items, add this back and register an App ID plus a Developer ID profile.
+	  This entitlement contains $(AppIdentifierPrefix), so it can only be authorised by
+	  a provisioning profile. See build-support/Irys.provisionprofile and tools/release.sh.
 	-->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.jng011.irys</string>
+	</array>
 	<key>com.apple.security.device.camera</key>
 	<true/>
 </dict>

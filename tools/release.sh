@@ -17,6 +17,14 @@ set -euo pipefail
 TEAM="6TTTJ5468H"
 IDENTITY="Developer ID Application: Daniel Ghiyam ($TEAM)"
 PROFILE="irys-notary"
+# keychain-access-groups contains $(AppIdentifierPrefix) and can only be
+# authorised by a provisioning profile. Without it the app builds and notarizes
+# fine but fails at runtime with errSecMissingEntitlement the moment it touches
+# the Touch-ID-gated Keychain item. build-support/Irys.provisionprofile is a
+# Developer ID (MAC_APP_DIRECT) profile for com.jng011.irys; install it with:
+#   cp build-support/Irys.provisionprofile \
+#      ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/
+PROFILE_NAME="Irys Developer ID"
 OUT="${1:-$HOME/Desktop}"
 BUILD="$(mktemp -d)"
 
@@ -29,13 +37,20 @@ echo "==> Building Release"
 xcodebuild -project glance.xcodeproj -scheme glance -configuration Release \
   -destination 'platform=macOS' -derivedDataPath "$BUILD" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" \
-  DEVELOPMENT_TEAM="$TEAM" PROVISIONING_PROFILE_SPECIFIER="" \
+  DEVELOPMENT_TEAM="$TEAM" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   OTHER_CODE_SIGN_FLAGS="--timestamp" build \
   | grep -E "error:|BUILD SUCCEEDED|BUILD FAILED" || true
 
 APP="$BUILD/Build/Products/Release/Irys.app"
 [ -d "$APP" ] || { echo "no app produced"; exit 1; }
+
+# Fail loudly rather than shipping an app that dies on first Touch ID prompt.
+if ! codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q keychain-access-groups; then
+  echo "REFUSING: keychain-access-groups missing from the signed app."
+  echo "  The provisioning profile \"$PROFILE_NAME\" is probably not installed."
+  exit 1
+fi
 
 echo "==> Signing Sparkle's nested helpers"
 # Xcode does not descend into apps and XPC services nested inside a framework,
