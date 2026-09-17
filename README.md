@@ -1,18 +1,13 @@
-<h1 align="center">
-  <br>
-  <img src="glance/Assets.xcassets/appicon.imageset/appicon.png" alt="Irys" width="140">
-  <br>
-  Irys
-  <br>
-</h1>
-
-<h3 align="center">Face unlock for your Mac</h3>
+<p align="center">
+  <img src="docs/images/hero.png" alt="Irys — face unlock for your Mac" width="860">
+</p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0E1014.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/macOS-15%2B-0E1014.svg" alt="macOS 15+">
-  <img src="https://img.shields.io/badge/Swift-SwiftUI-0E1014.svg" alt="Swift">
-  <img src="https://img.shields.io/badge/on--device-no%20network-0E1014.svg" alt="On-device">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-4E9142?labelColor=0E1014&style=flat-square" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/macOS-15%2B-4E9142?labelColor=0E1014&style=flat-square" alt="macOS 15+">
+  <img src="https://img.shields.io/badge/built%20with-SwiftUI-4E9142?labelColor=0E1014&style=flat-square" alt="SwiftUI">
+  <img src="https://img.shields.io/badge/on--device-no%20network-4E9142?labelColor=0E1014&style=flat-square" alt="On-device, no network">
+  <img src="https://img.shields.io/badge/Developer%20ID-notarized-4E9142?labelColor=0E1014&style=flat-square" alt="Notarized">
 </p>
 
 Sit down at your locked Mac and it unlocks. No typing, no reaching for the Touch ID key.
@@ -21,6 +16,13 @@ network call, ever.
 
 Irys lives in the notch. A pill expands while it looks for you, and collapses when it's done.
 
+<p align="center">
+  <img src="docs/images/scan.gif" alt="The notch animation: searching, then the unlock rings, then a check" width="200">
+</p>
+<p align="center">
+  <sub><i>Looking for you → recognised → unlocked. Irys' own notch animations.</i></sub>
+</p>
+
 ---
 
 ## Read this before you install
@@ -28,14 +30,17 @@ Irys lives in the notch. A pill expands while it looks for you, and collapses wh
 **Irys is a convenience feature, not a security upgrade.** It is not as strong as Touch ID or
 iPhone Face ID, and the reasons are worth understanding rather than skimming.
 
-**It types your password.** macOS provides no way for a third-party app to authorize a login.
-That is not a gap we failed to look for — it was checked properly: the smartcard route
-(`CryptoTokenKit`) requires real hardware, and the screensaver authorization right delegates to
-loginwindow instead of running a mechanism chain a plugin could join. So Irys recognises your
-face and then **enters your password for you**. Your password therefore lives on this Mac in a
-form that can be replayed. It is encrypted, gated behind Touch ID, and never leaves the device
-— but it exists. Every product in this category works this way, including the hardware ones;
-most of them don't say so.
+> ### It types your password
+>
+> macOS provides no way for a third-party app to authorize a login. That is not a gap we failed
+> to look for — it was checked properly: the smartcard route (`CryptoTokenKit`) requires real
+> hardware, and the screensaver authorization right delegates to loginwindow instead of running
+> a mechanism chain a plugin could join. So Irys recognises your face and then **enters your
+> password for you**.
+>
+> Your password therefore lives on this Mac in a form that can be replayed. It is encrypted,
+> gated behind Touch ID, and never leaves the device — but it exists. Every product in this
+> category works this way, including the hardware ones; most of them don't say so.
 
 **A MacBook webcam sees a flat image.** An iPhone projects 30,000 infrared dots and builds a
 depth map. Irys has one 2D camera and infers depth from parallax as you move. So:
@@ -62,7 +67,7 @@ Applications.
 Signed with a Developer ID certificate, notarized by Apple and stapled, so it opens without a
 Gatekeeper warning.
 
-## Permissions
+### Permissions
 
 | Permission | Why |
 |---|---|
@@ -80,6 +85,10 @@ Gatekeeper warning.
 4. **Recognition and liveness run as two independent gates.** Both must pass. Then Irys types
    the password.
 
+<p align="center">
+  <img src="docs/images/pipeline.png" alt="Pipeline: a camera frame feeds a recognition gate (detect, align, embed, compare) and a liveness gate (five cues over a rolling two-second window, two deny and three confirm). Both must pass before Irys types the password." width="900">
+</p>
+
 ### How it tells a face from a photograph
 
 Five cues over a rolling ~2s window, in two roles:
@@ -90,13 +99,21 @@ Five cues over a rolling ~2s window, in two roles:
   across head turns, blinks.
 
 What a confirm cue's *absence* means is the entire difference between the three levels, and it
-is the most security-relevant thing in this app:
+is the most security-relevant thing in this app.
+
+<p align="center">
+  <img src="docs/images/liveness-levels.png" alt="The three liveness levels: Minimal does not require confirm cues and is unlocked by a matte print; Balanced, the default, requires them and lets them vote; Strict requires one cue to fully fire." width="900">
+</p>
 
 | Level | Confirm cues | A matte print |
 |---|---|---|
 | **Minimal** | not required — absence is never a failure | **unlocks your Mac** |
 | **Balanced** *(default)* | required, and they vote: each cue is normalised against its own firing threshold and summed, so several partly-convinced cues pass together. Because no single cue decides alone, Balanced also reads at half the head rotation the others need | refused |
 | **Strict** | required, and one cue must fully fire on its own | refused |
+
+<sub>The two rings in the Irys mark are not concentric, and the offset is the point: depth pushes
+a real face's features off-axis when you turn your head, and a flat photograph's stay put. That
+difference is the cue the whole liveness check is built on.</sub>
 
 ## Features
 
@@ -166,15 +183,12 @@ get in. Every liveness change should be proven here before it lands.
 Longer write-ups of the things that were investigated rather than guessed at live in
 [`docs/proposals/`](docs/proposals):
 
-- **[001](docs/proposals/001-ring-light-feasibility.md)** — a screen-edge ring light for dark
-  rooms. An EDR Metal layer measurably doubles available white with no private API; the Mac
-  camera exposes no exposure controls at all, which reshapes the whole design.
-- **[002](docs/proposals/002-macos-auth-integration.md)** — whether the stored password can be
-  eliminated. For screen unlock: no. `sudo` is a different story.
-- **[003](docs/proposals/003-external-biometric-devices.md)** — what external fingerprint keys
-  for Mac actually do. They store your password and type it, same as this.
-- **[004](docs/proposals/004-single-frame-antispoofing.md)** — single-frame anti-spoofing
-  models, and why one would have to be a deny cue.
+| | |
+|---|---|
+| **[001](docs/proposals/001-ring-light-feasibility.md)** | A screen-edge ring light for dark rooms. An EDR Metal layer measurably doubles available white with no private API; the Mac camera exposes no exposure controls at all, which reshapes the whole design. |
+| **[002](docs/proposals/002-macos-auth-integration.md)** | Whether the stored password can be eliminated. For screen unlock: no. `sudo` is a different story. |
+| **[003](docs/proposals/003-external-biometric-devices.md)** | What external fingerprint keys for Mac actually do. They store your password and type it, same as this. |
+| **[004](docs/proposals/004-single-frame-antispoofing.md)** | Single-frame anti-spoofing models, and why one would have to be a deny cue. |
 
 ## Credits
 
