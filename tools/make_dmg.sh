@@ -66,7 +66,6 @@ tell application "Finder"
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
-    set the bounds of container window to {200, 140, 820, 560}
     set vopts to the icon view options of container window
     set arrangement of vopts to not arranged
     set icon size of vopts to 112
@@ -74,15 +73,20 @@ tell application "Finder"
     set label position of vopts to bottom
     set background picture of vopts to file ".background:background.png"
     -- Positions match the arrow drawn into the background image.
-    set position of item "Irys.app" of container window to {158, 180}
-    set position of item "Applications" of container window to {462, 180}
+    set position of item "Irys.app" of container window to {152, 196}
+    set position of item "Applications" of container window to {468, 196}
     -- Hidden entries still occupy the grid unless pushed out of the viewport.
     try
-      set position of item ".background" of container window to {700, 700}
+      set position of item ".background" of container window to {900, 900}
     end try
-    close
-    open
     update without registering applications
+    delay 1
+    -- Bounds LAST. Finder restores a remembered window size for a volume of this
+    -- name when the window is opened, so anything set before the final open gets
+    -- overwritten — which is exactly what left a band of empty window beside the
+    -- background image. 620x420 is the background's size; the extra 28pt of height
+    -- is the title bar, which `bounds` includes and the content area does not.
+    set the bounds of container window to {200, 140, 820, 588}
     delay 1
     close
   end tell
