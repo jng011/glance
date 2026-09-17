@@ -72,22 +72,33 @@ tell application "Finder"
     set text size of vopts to 12
     set label position of vopts to bottom
     set background picture of vopts to file ".background:background.png"
-    -- Positions match the arrow drawn into the background image.
     set position of item "Irys.app" of container window to {152, 196}
     set position of item "Applications" of container window to {468, 196}
-    -- Hidden entries still occupy the grid unless pushed out of the viewport.
     try
       set position of item ".background" of container window to {900, 900}
     end try
+
+    -- Set the bounds, then READ THEM BACK and retry until they take.
+    --
+    -- Finder restores a remembered window geometry for a volume of a given name
+    -- and will quietly overwrite a size set moments earlier, which is why simply
+    -- assigning bounds once left a strip of empty window beside the background.
+    -- Assign-and-verify is the only reliable way to know it actually applied.
+    --
+    -- 620x420 is the background's size; the extra 28pt of height is the title
+    -- bar, which `bounds` includes and the content area does not.
+    set targetBounds to {200, 140, 820, 588}
+    repeat 8 times
+      set the bounds of container window to targetBounds
+      delay 0.4
+      if the bounds of container window is targetBounds then exit repeat
+    end repeat
+
     update without registering applications
     delay 1
-    -- Bounds LAST. Finder restores a remembered window size for a volume of this
-    -- name when the window is opened, so anything set before the final open gets
-    -- overwritten — which is exactly what left a band of empty window beside the
-    -- background image. 620x420 is the background's size; the extra 28pt of height
-    -- is the title bar, which `bounds` includes and the content area does not.
-    set the bounds of container window to {200, 140, 820, 588}
-    delay 1
+    -- Assign once more after the update: `update` itself can reflow the window.
+    set the bounds of container window to targetBounds
+    delay 0.6
     close
   end tell
 end tell

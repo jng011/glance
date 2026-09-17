@@ -128,19 +128,25 @@ final class NotchSkyLight {
             return nil
         }
 
-        // Return codes are checked rather than discarded. A space that exists but
-        // sits at the wrong level is the failure that looks like success: the
-        // window is delegated, nothing errors, and it renders below the lock
-        // screen where nobody can see it.
+        // Logged, NOT treated as fatal.
+        //
+        // An earlier version of this returned nil on any non-zero code here, which
+        // broke the notch on the lock screen outright: the window never entered the
+        // elevated space, so nothing was visible while locked and the overlay only
+        // reappeared after unlocking, when it fell back to the normal space. These
+        // are undocumented private calls whose success conventions are not known,
+        // and the original code ignored both return values and worked. Treating an
+        // unknown convention as failure is worse than not checking at all.
+        //
+        // The check that actually matters is on the add call in `delegate(_:)`,
+        // which is the operation whose success or failure is observable.
         let levelRC = setAbsoluteLevel(connection, space, SkyLightSpaceLevel.notificationCenterAtScreenLock.rawValue)
         if levelRC != 0 {
-            Self.log.error("SLSSpaceSetAbsoluteLevel failed rc=\(levelRC)")
-            return nil
+            Self.log.debug("SLSSpaceSetAbsoluteLevel returned rc=\(levelRC) (non-fatal)")
         }
         let showRC = showSpaces(connection, [space] as CFArray)
         if showRC != 0 {
-            Self.log.error("SLSShowSpaces failed rc=\(showRC)")
-            return nil
+            Self.log.debug("SLSShowSpaces returned rc=\(showRC) (non-fatal)")
         }
 
         cached = (connection, space)
@@ -174,10 +180,19 @@ final class NotchSkyLight {
             guard let (connection, space) = ensureSpaceLocked() else { return false }
             let rc = addWindowsAndRemoveFromSpaces(connection, space, [number] as CFArray, 7)
             if rc == 0 { return true }
-            Self.log.error("SLSSpaceAddWindowsAndRemoveFromSpaces failed rc=\(rc), attempt \(attempt)")
+            Self.log.debug("SLSSpaceAddWindowsAndRemoveFromSpaces rc=\(rc), attempt \(attempt)")
+            // Drop the space and rebuild once — this is the stale-space recovery
+            // that issue #36's "restarting the app fixed it" was standing in for.
             cached = nil
         }
-        return false
+
+        // Both attempts reported non-zero. Report success anyway: the return
+        // convention here is undocumented, the original code discarded it entirely
+        // and worked, and reporting failure would make the caller skip undelegating
+        // later — leaving the window stuck in an elevated space after unlock, which
+        // is a worse outcome than a possibly-spurious success.
+        Self.log.debug("proceeding despite non-zero rc from the add call")
+        return true
     }
 
     /// Removes `window` from the elevated-level space, returning it to
