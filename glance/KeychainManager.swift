@@ -16,19 +16,57 @@ enum KeychainError: LocalizedError {
     case authenticationFailed
     case osStatus(OSStatus)
 
+    /// Every case says what the user can actually do about it.
+    ///
+    /// These strings are shown inline under the password field during onboarding,
+    /// where a bare Security-framework message is worse than useless: it is
+    /// alarming, unsearchable, and gives no next step. `errSecMissingEntitlement`
+    /// in particular rendered as "Keychain error: A required entitlement is not
+    /// present", which tells a user nothing they can act on and does not even
+    /// hint that the build is at fault rather than their Mac.
     var errorDescription: String? {
         switch self {
         case .itemNotFound:
-            return "Keychain item not found."
+            return "That Keychain item is missing. Set up your password again to recreate it."
         case .unexpectedData:
-            return "Keychain item had an unexpected format."
+            return "The stored Keychain item is in an unexpected format. "
+                 + "Remove the stored password on the Password tab, then set it again."
         case .accessControlFailed(let msg):
-            return "Couldn't create Keychain access control: \(msg)"
+            return "Couldn't set up Touch ID protection for the stored password (\(msg)). "
+                 + "Check that Touch ID is enrolled in System Settings, then try again."
         case .authenticationFailed:
-            return "Authentication was cancelled or failed."
+            return "Touch ID was cancelled or didn't match. Try again."
         case .osStatus(let status):
-            let message = SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)"
-            return "Keychain error: \(message)"
+            return Self.actionable(for: status)
+        }
+    }
+
+    /// Maps the handful of OSStatus values this app can realistically produce to
+    /// something a user can act on, and falls back to the system string plus the
+    /// numeric code for everything else — the code matters, because it is the only
+    /// searchable part of an unrecognised failure.
+    private static func actionable(for status: OSStatus) -> String {
+        let system = SecCopyErrorMessageString(status, nil) as String? ?? "unknown error"
+        switch status {
+        case errSecMissingEntitlement:
+            // Not the user's fault and not fixable by them. Say so, rather than
+            // leaving them retrying a thing that cannot work.
+            return "This build of Irys isn't signed correctly, so it can't use the Keychain "
+                 + "(\(system)). Nothing you can change will fix it — please report this at "
+                 + "github.com/jng011/glance/issues."
+        case errSecUserCanceled:
+            return "Touch ID was cancelled. Try again when you're ready."
+        case errSecAuthFailed:
+            return "Touch ID didn't match. Try again, or use your Mac password at the prompt."
+        case errSecDuplicateItem:
+            return "A stored password already exists. Remove it on the Password tab, then set a new one."
+        case errSecInteractionNotAllowed:
+            return "The Keychain is locked right now. Unlock your Mac and try again."
+        case errSecNotAvailable:
+            return "The Keychain isn't available yet. Wait a moment after logging in, then try again."
+        default:
+            return "Keychain error \(status): \(system). If this keeps happening, please report it at "
+                 + "github.com/jng011/glance/issues."
         }
     }
 }

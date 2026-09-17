@@ -102,6 +102,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
         menu.addItem(settingsItem)
 
+        // Straight to the enrollment tab. Adding a second face — with glasses, or in
+        // different light — is the single most common reason recognition is failing,
+        // and it was three clicks deep with nothing pointing at it.
+        let enrollItem = NSMenuItem(title: "Add a Face…", action: #selector(openEnrollment), keyEquivalent: "")
+        enrollItem.target = self
+        enrollItem.image = NSImage(systemSymbolName: "person.crop.circle.badge.plus", accessibilityDescription: nil)
+        menu.addItem(enrollItem)
+
+        menu.addItem(.separator())
+
+        // Some settings only take effect on a fresh launch (camera format and the
+        // Core ML model are both chosen at startup), and "quit, then find the app
+        // again" is a poor thing to ask of someone who has just changed one.
+        let relaunchItem = NSMenuItem(title: "Quit and Reopen", action: #selector(relaunch), keyEquivalent: "")
+        relaunchItem.target = self
+        relaunchItem.image = NSImage(systemSymbolName: "arrow.clockwise.circle.fill", accessibilityDescription: nil)
+        menu.addItem(relaunchItem)
+
         let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quitItem.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: nil)
         menu.addItem(quitItem)
@@ -224,6 +242,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// reopen behavior just brings it forward.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         return flag
+    }
+
+    /// Relaunches the app: spawns a detached copy of this bundle, then terminates.
+    ///
+    /// `open -n` rather than re-exec'ing so the new instance is owned by launchd
+    /// rather than being a child of a process that is about to die. The short delay
+    /// lets this instance finish terminating first — two copies briefly overlapping
+    /// would both try to own the menu bar item and the notch window.
+    @objc private func relaunch() {
+        let bundlePath = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "sleep 0.6; /usr/bin/open -n \"\(bundlePath)\""]
+        do {
+            try task.run()
+        } catch {
+            // Nothing recoverable to do — fall back to a plain quit rather than
+            // leaving the user staring at a menu item that did nothing.
+            NSApp.terminate(nil)
+            return
+        }
+        NSApp.terminate(nil)
+    }
+
+    /// Menu bar "Add a Face…" — opens Settings on the enrollment tab.
+    @objc private func openEnrollment() {
+        SettingsWindowRouter.shared.requestedTab = .yourFace
+        revealSettingsWindow()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// Menu bar "Settings" — the only user-facing way to open the window after onboarding.

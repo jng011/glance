@@ -75,6 +75,21 @@ struct SettingsWindowView: View {
         // NSWindow out, keeping `@State` alive, so without this `selection`
         // would remember the last tab instead of resetting to General.
         .onDisappear { selection = .general }
+        // Consume a tab request from outside (menu bar "Add a Face…"). Cleared
+        // immediately so reopening the window later lands on General as usual.
+        .onAppear {
+            if let requested = SettingsWindowRouter.shared.requestedTab {
+                selection = requested
+                SettingsWindowRouter.shared.requestedTab = nil
+            }
+        }
+        .onChange(of: SettingsWindowRouter.shared.requestedTab) { _, requested in
+            // Also handles the window already being open when the menu item fires.
+            if let requested {
+                selection = requested
+                SettingsWindowRouter.shared.requestedTab = nil
+            }
+        }
     }
 
     /// The header and tab bar float over the scroll content as overlays so
