@@ -149,6 +149,13 @@ final class NotchOverlayController {
     func disarm() {
         isArmed = false
         onActivate = nil
+        // Onboarding is a different tenant of this panel, and it is not this method's
+        // to evict. `FaceUnlockCoordinator` disarms on any lock/wake event that finds
+        // the screen unlocked — a display sleeping and waking mid-setup is enough — and
+        // the rest of this method would then hide the window and drop the
+        // `OnboardingController` out of `content`, leaving the flow running with no UI
+        // and no way back into it short of restarting setup from the beginning.
+        guard phase != .onboarding else { return }
         // Undocked before the guard: if a success collapse is already in flight, this
         // turns it into a full slide-off-screen exit rather than a shrink to a resting pill.
         isPillDocked = false
