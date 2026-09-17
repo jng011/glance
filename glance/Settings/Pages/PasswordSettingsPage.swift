@@ -185,7 +185,7 @@ private struct StayUnlockedRow: View {
         VStack(alignment: .leading, spacing: 8) {
             SettingsRowContent(
                 title: "Stay unlocked until restart",
-                subtitle: "Skips Touch ID after the first login. Any app running as you could then read your stored password.",
+                subtitle: "Ask for Touch ID once when you log in, instead of every time. The trade-off: other apps on your Mac could read your saved password.",
                 subtitleMaxWidth: SettingsMetrics.rowSubtitleMaxWidth
             ) {
                 if isWorking {
@@ -285,11 +285,11 @@ private struct HelperInstallRow: View {
     private var subtitle: String {
         switch client.availability {
         case .enabled:
-            return "Installed. Your session key is held by a root helper that only releases it to Irys."
+            return "On. Your saved password is kept somewhere only Irys can reach, so other apps can't read it."
         case .requiresApproval:
-            return "Installed, but macOS needs you to switch it on in Login Items."
+            return "Almost there — macOS needs you to switch it on in Login Items."
         case .notRegistered:
-            return "Not installed. Without it, \"Stay unlocked\" leaves the key readable by any app running as you."
+            return "Recommended if you turn on \"Stay unlocked\". Keeps your saved password out of reach of other apps."
         case .unavailable(let reason):
             return reason
         }

@@ -130,7 +130,7 @@ struct SecurityNoticeStepView: View {
             // burying that until a user happens to open Settings would be the
             // dishonest choice. Naming the default is the point: it is what almost
             // everyone will actually run.
-            Text("Irys checks that it's a real face and not a photo. Its **Balanced** default refuses a printed photo. The **Minimal** setting does not — a printed photo of you will unlock your Mac. You'll be warned before switching to it.")
+            Text("Irys checks you're really there, not a photo of you. On the normal setting a printed photo won't get in. There's a **Minimal** setting that skips that check — a photo *will* unlock your Mac — and Irys will warn you before you switch to it.")
                 .font(GlanceTheme.Font.passwordCaption)
                 .foregroundStyle(GlanceTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

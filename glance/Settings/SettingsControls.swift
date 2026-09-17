@@ -797,7 +797,7 @@ struct LivenessModePicker: View {
         VStack(alignment: .leading, spacing: 10) {
             SettingsLabeledOptionRow(
                 title: "Strength",
-                subtitle: "Balanced is recommended. Strict requires you to blink or clearly turn your head."
+                subtitle: "How carefully Irys checks that it's really you, and not a photo."
             ) {
                 ForEach(LivenessMode.allCases) { mode in
                     SettingsOptionTile(

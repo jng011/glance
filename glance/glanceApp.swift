@@ -76,6 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        restoreSessionIfStayUnlocked()
+
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // Custom mark, not an SF Symbol; `isTemplate` is cheap insurance against a plain black-square render.
         let icon = NSImage(named: "MenuBarIcon")
@@ -242,6 +244,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// reopen behavior just brings it forward.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         return flag
+    }
+
+    /// Reads the session key back at launch when "Stay unlocked until restart" is on.
+    ///
+    /// Without this the setting did not actually do its job. The key is stored so
+    /// it reads with no Touch ID prompt, but nothing read it at startup — so the
+    /// app came up reporting "Session locked", and clicking that button was what
+    /// performed the (silent, instant) read. The user had asked not to be
+    /// interrupted and was still being made to click something.
+    ///
+    /// Off the main actor because the read touches the Keychain and, when the
+    /// privileged helper is installed, makes a blocking XPC round trip; doing
+    /// either on the main thread would stall the first frame.
+    private func restoreSessionIfStayUnlocked() {
+        guard GlanceSettings.staysUnlockedUntilRestartValue else { return }
+        Task.detached(priority: .userInitiated) {
+            // No prompt can appear for this: an ungated Keychain item and the
+            // helper both read without user presence. If it somehow cannot be
+            // read, staying locked is the correct outcome — the normal Touch ID
+            // path still works.
+            try? SecureCredentialManager.unlockSession(reason: "Restoring your Irys session")
+            await MainActor.run { self.environment.pocController.refreshCredentialStatus() }
+        }
     }
 
     /// Relaunches the app: spawns a detached copy of this bundle, then terminates.

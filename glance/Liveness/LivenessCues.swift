@@ -111,9 +111,9 @@ enum LivenessMode: String, CaseIterable, Identifiable, Sendable {
 
     var summary: String {
         switch self {
-        case .light: return "Only rejects obvious spoofs."
-        case .medium: return "Requires combined proof of a real face."
-        case .heavy: return "Requires one full proof of life."
+        case .light: return "Catches only the obvious fakes."
+        case .medium: return "Checks you're really there. Recommended."
+        case .heavy: return "Strictest. You may need to blink or turn your head."
         }
     }
 
@@ -128,8 +128,8 @@ enum LivenessMode: String, CaseIterable, Identifiable, Sendable {
     var downgradeWarning: String? {
         switch self {
         case .light:
-            return "Minimal only rejects obvious spoofs. A printed photo of your face "
-                 + "can unlock your Mac. This has been reproduced on real hardware."
+            return "On Minimal, a printed photo of your face can unlock your Mac. "
+                 + "We've tested this and it works. Only pick this if you're fine with that."
         case .medium, .heavy:
             return nil
         }
