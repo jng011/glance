@@ -604,6 +604,11 @@ final class OnboardingController {
     /// in the full setup flow, a cancel in add/recapture.
     func back() {
         navDirection = .backward
+        // `advance()` stops the poll when it leaves `.permissions`; `back()` never did,
+        // so Permissions → Intro left a 1s timer running for the rest of the flow. It
+        // writes two `@Observable` properties on every tick, which re-evaluates whatever
+        // step view is on screen sixty times a minute for nothing.
+        if step == .permissions { stopPermissionsPolling() }
         // No earlier step to return to in the password-only flow — Back is a plain cancel.
         if isPasswordOnly {
             teardown()
@@ -931,6 +936,12 @@ final class OnboardingController {
         ))
         poseSampleCounts[pose, default: 0] += 1
         poseStartedAt = .now
+        // Restart the hold clock after *every* capture, not only when the bin fills.
+        // Without this the second sample of a pose was taken ~3 frames (~100ms) after
+        // the first, because `poseHoldStartedAt` still pointed at the original settle:
+        // 18 samples, but only 9 distinct moments, and two near-identical embeddings
+        // per pose is a measurably weaker template than two spaced ones.
+        poseHoldStartedAt = .now
 
         if samplesNeeded(for: pose) == 0 {
             if pose == .center {
@@ -990,6 +1001,12 @@ final class OnboardingController {
         try? await Task.sleep(for: .seconds(remaining))
 
         camera.stop()
+
+        // Roughly two seconds of sleeps happened above, and nothing here re-checked
+        // that enrollment still owns the flow. Anything that left `.enroll` in the
+        // meantime (`back()`, which also clears `collectedSamples`) would be dragged
+        // into the naming step by this line and then asked to name an empty capture.
+        guard step == .enroll, enrollmentComplete else { return }
 
         navDirection = .forward
         withAnimation(OnboardingMetrics.stepAnimation) { step = .name }

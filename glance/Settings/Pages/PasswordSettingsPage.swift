@@ -98,6 +98,10 @@ struct PasswordSettingsPage: View {
 
                 SettingsGroupDivider()
 
+                StayUnlockedRow()
+
+                SettingsGroupDivider()
+
                 SettingsSteppedSliderRowContent(
                     title: "Auto lock session",
                     valueLabel: settings.autoLockInterval.title,
@@ -107,6 +111,10 @@ struct PasswordSettingsPage: View {
                     ),
                     stopCount: AutoLockInterval.allCases.count
                 )
+                // The idle timer has no effect while the session never locks, so
+                // showing it as live would be a lie.
+                .disabled(settings.staysUnlockedUntilRestart)
+                .opacity(settings.staysUnlockedUntilRestart ? 0.4 : 1)
 
                 SettingsGroupDivider()
 
@@ -155,6 +163,73 @@ struct PasswordSettingsPage: View {
             statusMessage = "Password and face enrollment removed."
         } catch {
             statusMessage = "Couldn't remove: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// Toggle for `GlanceSettings.staysUnlockedUntilRestart`.
+///
+/// Separate view because flipping it is not a settings write — it re-stores the
+/// session key in the Keychain with or without its Touch ID gate, which can
+/// prompt and can fail, and a plain `Binding` has nowhere to put either.
+private struct StayUnlockedRow: View {
+    @State private var settings = GlanceSettings.shared
+    @State private var isWorking = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SettingsRowContent(
+                title: "Stay unlocked until restart",
+                subtitle: "Skips Touch ID after the first login. Any app running as you could then read your stored password.",
+                subtitleMaxWidth: SettingsMetrics.rowSubtitleMaxWidth
+            ) {
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    GlanceToggle(isOn: Binding(
+                        get: { settings.staysUnlockedUntilRestart },
+                        set: { apply($0) }
+                    ))
+                }
+            }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(GlanceTheme.statusDenied)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
+                    .padding(.bottom, 8)
+            }
+        }
+    }
+
+    /// Migrates the key first and only records the setting if that succeeded.
+    ///
+    /// Writing the flag first would leave the app believing the key is ungated
+    /// when it is still gated — every unlock would then fall back to a Touch ID
+    /// prompt the user was told they had turned off, with nothing explaining why.
+    private func apply(_ enabled: Bool) {
+        isWorking = true
+        error = nil
+        let reason = enabled
+            ? "Authenticate to keep Irys unlocked until restart"
+            : "Authenticate to re-protect the Irys session with Touch ID"
+
+        Task.detached {
+            do {
+                try SecureCredentialManager.setStaysUnlocked(enabled, reason: reason)
+                await MainActor.run {
+                    settings.staysUnlockedUntilRestart = enabled
+                    isWorking = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = error.localizedDescription
+                    isWorking = false
+                }
+            }
         }
     }
 }

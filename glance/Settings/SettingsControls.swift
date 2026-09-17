@@ -421,6 +421,17 @@ struct HoldToConfirmButton: View {
                     fillProgress = isPressing ? 1 : 0
                 }
             }
+            // A bare `Text` with a gesture on it is, to assistive technology, a label —
+            // no trait, no action, nothing to activate. That made deleting an enrolled
+            // face reachable only by holding a mouse button down, which is exactly the
+            // interaction a motor-impaired or VoiceOver user cannot perform. The
+            // explicit action substitutes for the hold; the hold is a deliberate
+            // speed bump for pointer users, not a security boundary.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Press and hold for \(Int(holdDuration)) seconds to confirm")
+            .accessibilityAction(.default, action)
     }
 }
 
@@ -810,6 +821,15 @@ struct LivenessModePicker: View {
         .animation(.easeInOut(duration: 0.22), value: pendingDowngrade)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
+        // An unanswered question has to die with the thing it was asking about.
+        // Switching liveness off leaves the warning card sitting there greyed out
+        // with both its buttons disabled — unanswerable, and still there when the
+        // toggle comes back on. Likewise a mode set from anywhere but these tiles
+        // makes the pending choice stale.
+        .onChange(of: isEnabled) { _, enabled in
+            if !enabled { pendingDowngrade = nil }
+        }
+        .onChange(of: selection) { _, _ in pendingDowngrade = nil }
     }
 
     /// Weakening the check is the one setting in this app that can hand someone

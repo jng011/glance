@@ -124,6 +124,20 @@ enum SecureCredentialManager {
     nonisolated static func unlockSession(reason: String) throws {
         if cachedKey() != nil { return }
 
+        // "Stay unlocked" mode: the key was stored without .userPresence, so it reads
+        // straight back with no prompt. This is the entire feature — after one macOS
+        // login the session is simply never locked again.
+        //
+        // Deliberately falls through to the gated path if the read fails, which is the
+        // case where the setting is on but the key is still stored gated (the toggle
+        // was flipped while the key could not be migrated).
+        if GlanceSettings.staysUnlockedUntilRestartValue,
+           KeychainManager.exists(account: sessionKeyAccount),
+           let data = try? KeychainManager.read(account: sessionKeyAccount, context: nil) {
+            setCachedKey(SymmetricKey(data: data))
+            return
+        }
+
         // The existence check, not the read, decides whether a key gets created (load-bearing): a cancelled Touch ID prompt on
         // a user-presence item reports `errSecItemNotFound`, indistinguishable from no key — deciding on the read's error would
         // mint a fresh key (destroying the one that decrypts existing data) on every mis-tap.
@@ -142,7 +156,13 @@ enum SecureCredentialManager {
         }
 
         let key = SymmetricKey(size: .bits256)
-        let access = try KeychainManager.makeUserPresenceAccessControl()
+        // A key minted while "stay unlocked" is on must be stored ungated from the
+        // start; creating it gated and migrating immediately would put a Touch ID
+        // prompt in front of a user who switched the setting on precisely to stop
+        // seeing them.
+        let access = GlanceSettings.staysUnlockedUntilRestartValue
+            ? nil
+            : try KeychainManager.makeUserPresenceAccessControl()
         try KeychainManager.save(
             account: sessionKeyAccount,
             data: key.withUnsafeBytes { Data($0) },
@@ -164,6 +184,37 @@ enum SecureCredentialManager {
     /// Clears the cached session key. Next save/read requires Touch ID again.
     nonisolated static func lockSession() {
         setCachedKey(nil)
+    }
+
+    /// Moves the existing session key between Touch-ID-gated and ungated storage.
+    ///
+    /// Re-stores the SAME key rather than minting a new one — a new key would leave
+    /// the stored password and every enrolled face encrypted under a key that no
+    /// longer exists, which is unrecoverable.
+    ///
+    /// Turning this ON is a real security downgrade, not a theoretical one: with
+    /// `.userPresence` removed, any process running as this user can read the key
+    /// out of the Keychain and decrypt the Mac password with it. What it buys is
+    /// that the session survives the app quitting and the Mac restarting, so Touch
+    /// ID is asked for once per macOS login instead of repeatedly.
+    ///
+    /// Blocking, and prompts Touch ID once when leaving the gated state. Call from a
+    /// background task.
+    nonisolated static func setStaysUnlocked(_ enabled: Bool, reason: String) throws {
+        // Reading the key is what proves we can migrate it at all; do this before
+        // deleting anything, so a cancelled prompt leaves the old item untouched.
+        try unlockSession(reason: reason)
+        guard let key = cachedKey() else { throw SecureCredentialError.sessionKeyUnavailable }
+        let material = key.withUnsafeBytes { Data($0) }
+
+        let access = enabled ? nil : try KeychainManager.makeUserPresenceAccessControl()
+        // `save` deletes any existing item for this account before adding, so this is
+        // a replace rather than a duplicate.
+        try KeychainManager.save(account: sessionKeyAccount, data: material, accessControl: access)
+
+        // Keep the key cached across the migration: dropping it here would demand a
+        // fresh Touch ID prompt immediately after the user asked for fewer of them.
+        setCachedKey(key)
     }
 
     /// Encrypts and stores `passwordBytes`. Requires an unlocked session —

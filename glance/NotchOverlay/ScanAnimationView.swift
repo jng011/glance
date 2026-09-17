@@ -82,6 +82,19 @@ final class ScanAnimationHostView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// `apply(media:)` only tears down when it is *replacing* a player, so nothing
+    /// cleaned up the last one. This view is recreated every time the overlay panel
+    /// is rebuilt, which on the lock screen is once per unlock attempt: without this
+    /// each cycle left a block-based NotificationCenter observer registered forever
+    /// and an AVPlayer still holding its decode pipeline open.
+    deinit {
+        if let loopObserver {
+            NotificationCenter.default.removeObserver(loopObserver)
+        }
+        fallbackRevealWorkItem?.cancel()
+        player?.pause()
+    }
+
     override func layout() {
         super.layout()
         CATransaction.begin()
@@ -106,6 +119,15 @@ final class ScanAnimationHostView: NSView {
 
         guard let url = Bundle.main.url(forResource: resource, withExtension: "mp4") else {
             assertionFailure("\(resource).mp4 missing from bundle — check glance/Resources/")
+            // `assertionFailure` is compiled out of release, so this path is reachable by
+            // real users. Returning as-is left the *previous* clip playing under the new
+            // state — a failure animation looping while the panel believed it was idle —
+            // and `currentMedia` already claimed the new state, so no later call could
+            // correct it. Fall back to the still frame and forget the claim instead.
+            currentMedia = nil
+            teardownPlayer()
+            playerLayer.isHidden = true
+            stillImageLayer.isHidden = false
             return
         }
 

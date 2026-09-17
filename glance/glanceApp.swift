@@ -290,11 +290,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// out of sync. During onboarding this only ensures the notch flow is up; it doesn't open Settings or show a Dock icon.
     private func revealSettingsWindow() {
         if isBlockedByPostUpdateNotice {
+            // `openEnrollment()` sets the router's tab before calling this, and the
+            // router is explicitly one-shot. Bailing out without spending the request
+            // leaves it armed, so whenever Settings does finally open — even from the
+            // plain "Settings" menu item — it lands on Your Face instead of General.
+            SettingsWindowRouter.shared.requestedTab = nil
             presentPostUpdateSecurityNotice()
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         guard GlanceSettings.shared.hasCompletedOnboarding else {
+            // Same reason as the branch above — the request is spent whether or not
+            // Settings actually opens.
+            SettingsWindowRouter.shared.requestedTab = nil
             // Re-present rather than restart: a fresh startFlow() would throw away the in-session step already navigated to,
             // since it only knows the last step written to disk.
             if NotchOverlayController.shared.phase != .onboarding {

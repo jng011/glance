@@ -310,6 +310,12 @@ struct NotchOverlayView: View {
             scanPulseTask = nil
             lockUnlockTask?.cancel()
             lockUnlockTask = nil
+            // The other two were cancelled here but this one was not, so a panel torn
+            // down mid-stagger still had a `withAnimation` scheduled against it. On the
+            // way back in `onAppear` syncs the mirrors without animating, and the stale
+            // task would then fire afterwards and animate them somewhere else.
+            choreographyTask?.cancel()
+            choreographyTask = nil
         }
         .onChange(of: controller.phase) { _, newPhase in
             scheduleChoreography()

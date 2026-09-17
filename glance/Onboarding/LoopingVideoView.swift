@@ -45,6 +45,17 @@ final class LoopingVideoHostView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// `teardown()` only ran when the resource name changed, so a view that simply
+    /// went away (every onboarding step change past Pre-set-up) left its
+    /// `AVPlayerItemDidPlayToEndTime` observer registered for the process lifetime.
+    deinit {
+        pendingRestart?.cancel()
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        player?.pause()
+    }
+
     override func layout() {
         super.layout()
         CATransaction.begin()

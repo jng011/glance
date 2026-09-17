@@ -44,6 +44,11 @@ final class SessionAutoLocker {
     /// Routed through `POCController.lockSession()` rather than `SecureCredentialManager` directly, so the Settings UI's
     /// `isSessionUnlocked` flag doesn't go stale.
     func evaluate() {
+        // "Stay unlocked" means stay unlocked. Re-locking on an idle timer would
+        // reintroduce the Touch ID prompt the setting exists to remove, just on a
+        // delay, which would read as the setting not working.
+        guard !GlanceSettings.shared.staysUnlockedUntilRestart else { return }
+
         guard SecureCredentialManager.isSessionUnlocked,
               let lastActivityAt = SecureCredentialManager.lastActivityAt
         else { return }

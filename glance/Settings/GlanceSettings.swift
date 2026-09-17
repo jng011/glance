@@ -96,6 +96,7 @@ final class GlanceSettings {
         static let livenessMode = "GlanceSettings.livenessMode"
         static let minimumFaceWidth = "GlanceSettings.minimumFaceWidth"
         static let unlockAnimationStyle = "GlanceSettings.unlockAnimationStyle"
+        static let staysUnlockedUntilRestart = "GlanceSettings.staysUnlockedUntilRestart"
         static let showUnlockAnimation = "GlanceSettings.showUnlockAnimation"
         /// Legacy bool key — read once during migration, then ignored.
         static let playUnlockAnimation = "GlanceSettings.playUnlockAnimation"
@@ -149,6 +150,33 @@ final class GlanceSettings {
     }
     var showUnlockAnimation: Bool {
         didSet { defaults.set(showUnlockAnimation, forKey: Key.showUnlockAnimation) }
+    }
+
+    /// Store the session key without a Touch ID gate, so the session survives the
+    /// app quitting and the Mac restarting.
+    ///
+    /// Defaults to false, and stays that way: it removes the protection that stops
+    /// any other process running as this user from reading the key and decrypting
+    /// the stored Mac password. It is offered because being asked for Touch ID
+    /// repeatedly is the app's most common complaint, but it is the user's decision
+    /// to make knowingly rather than a silent default.
+    ///
+    /// Writing this does NOT migrate the key — see
+    /// `SecureCredentialManager.setStaysUnlocked(_:reason:)`, which must be called
+    /// to actually move it, and which is what the Settings toggle drives.
+    var staysUnlockedUntilRestart: Bool {
+        didSet { defaults.set(staysUnlockedUntilRestart, forKey: Key.staysUnlockedUntilRestart) }
+    }
+
+    /// The same flag, readable off the main actor.
+    ///
+    /// `shared` is main-actor isolated, and the Keychain paths that need this are
+    /// nonisolated and blocking by design — hopping to the main actor from inside
+    /// them to read one Bool would risk deadlocking the very thread pool those
+    /// methods warn about. UserDefaults is the source of truth either way, so this
+    /// reads it directly rather than mirroring state.
+    nonisolated static var staysUnlockedUntilRestartValue: Bool {
+        UserDefaults.standard.bool(forKey: Key.staysUnlockedUntilRestart)
     }
 
     /// What the overlay should actually render — the pick, or `.none` when
@@ -264,6 +292,7 @@ final class GlanceSettings {
         // catches the main attack (a photo on a phone screen).
         // Was `.light`, which a matte print defeats outright — see `LivenessMode.light`.
         // Raw values are unchanged, so an existing explicit choice still migrates.
+        staysUnlockedUntilRestart = defaults.bool(forKey: Key.staysUnlockedUntilRestart)
         livenessMode = defaults.string(forKey: Key.livenessMode)
             .flatMap(LivenessMode.init(rawValue:)) ?? .recommended
         // Matches `DetectionDistanceLevel.standard` — see RecognitionSettingsPage.swift.
