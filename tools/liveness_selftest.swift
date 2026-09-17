@@ -382,6 +382,7 @@ struct LivenessSelfTest {
     static func main() {
         runGeometryTests()
         runDecisionModelTests()
+        runMediumModeTests()
         runAbstentionTests()
         print("\nAll liveness self-tests passed.")
     }
@@ -508,7 +509,7 @@ struct LivenessSelfTest {
                 fatalError("FAIL: sustained screen glare should deny in \(mode.title) mode, got \(result.decision).")
             }
         }
-        print("PASS: sustained glare denies in both Light and Heavy mode.")
+        print("PASS: sustained glare denies in every mode.")
 
         // Device overlap above the fire level must deny, even well below
         // the old 0.55 bezel threshold — 20% for a few frames is the rule.
@@ -601,6 +602,84 @@ struct LivenessSelfTest {
             "FAIL: depthPoseLevel (\(LivenessTuning.default.depthPoseLevel)) is at or below 0.5, which is zero correlation — noise alone would confirm liveness."
         )
         print("PASS: the depth/pose gate sits above the zero-correlation midpoint.")
+    }
+
+    // MARK: - Medium mode
+
+    /// Medium exists to close one specific hole: Light confirms anything it did not
+    /// actively reject, so a matte print with its edges out of frame unlocks the Mac
+    /// (reproduced on real hardware). Medium requires the confirm cues to actually
+    /// produce evidence, summed after normalising each against its own fire level.
+    private static func runMediumModeTests() {
+        print("")
+        let need = LivenessTuning.default.mediumConfirmScore
+
+        let cases: [(String, [LivenessFrame], Bool)] = [
+            ("live 1.0px",   generateLiveSequence(frameCount: frameCount, noiseStd: 1.0, seed: 2), true),
+            ("live 1.5px",   generateLiveSequence(frameCount: frameCount, noiseStd: 1.5, seed: 2), true),
+            ("live 2.0px",   generateLiveSequence(frameCount: frameCount, noiseStd: 2.0, seed: 2), true),
+            ("tilted photo", generateTiltedPhotoSequence(frameCount: frameCount, noiseStd: 1.0, seed: 4), false),
+            ("wobble photo", generatePlanarSequence(frameCount: frameCount, noiseStd: 1.0, seed: 1), false),
+            ("still photo",  generateStillPlanarSequence(frameCount: frameCount, noiseStd: 1.0, seed: 0), false),
+        ]
+
+        print(String(format: "Medium confirm score (needs %.2f):", need))
+        for (label, frames, shouldPass) in cases {
+            let snapshot = evaluate(frames, mode: .medium)
+            print(String(format: "  %-13@ %.3f", label as NSString, snapshot.confirmEvidenceTotal))
+            precondition(
+                snapshot.decision.isConfirmed == shouldPass,
+                "FAIL: Medium should \(shouldPass ? "confirm" : "not confirm") \(label), "
+                + "got \(snapshot.decision) at evidence \(snapshot.confirmEvidenceTotal)."
+            )
+        }
+        print("PASS: Medium confirms a rotating live head at every tested noise level and no photo sequence.")
+
+        // The reason this mode exists. A face that triggers no confirm cue at all is
+        // exactly what a matte print looks like, and Light waves it through.
+        let noEvidence = (0..<12).map { makeCueFrame(at: Double($0) * 0.05, glare: skinGlare) }
+        guard case .confirmed(nil) = evaluate(noEvidence, mode: .light).decision else {
+            fatalError("FAIL: the premise of this test is that Light confirms a face with no confirm evidence.")
+        }
+        precondition(
+            evaluate(noEvidence, mode: .medium).decision == .pending,
+            "FAIL: Medium confirmed a face that produced no confirm evidence — this is the printed-photo bypass."
+        )
+        print("PASS: a face with no confirm evidence passes Light and is refused by Medium.")
+
+        // KNOWN LIMITATION, asserted so it stays visible rather than being rediscovered.
+        // Below `GeometryTuning.minYawRangeDegrees` every confirm cue abstains outright,
+        // so there is no partial evidence for Medium to sum. A user who holds perfectly
+        // still is not helped by this mode. Lowering that gate for Medium is the follow-up;
+        // an active (illumination-modulated) confirm cue is the real fix.
+        let stillLive = generateStillLiveSequence(frameCount: frameCount, noiseStd: 0.3, seed: 5)
+        precondition(
+            evaluate(stillLive, mode: .medium).decision == .pending,
+            "FAIL: a perfectly still live head now passes Medium — if this is intentional, "
+            + "update this test and the note on `mediumConfirmScore`."
+        )
+        print("PASS: (known limitation) a perfectly still live head still stalls in Medium, as in Strict.")
+
+        // Medium must not be able to confirm before the deny cues have had frames to run,
+        // for the same reason Light must not — see `mediumModeMinimumFrames`.
+        let live = generateLiveSequence(frameCount: frameCount, noiseStd: 1.0, seed: 2)
+        let early = Array(live.prefix(LivenessTuning.default.mediumModeMinimumFrames - 1))
+        precondition(
+            !evaluate(early, mode: .medium).decision.isConfirmed,
+            "FAIL: Medium confirmed before its minimum observation window elapsed."
+        )
+        print("PASS: Medium waits for its minimum observation window before it can confirm.")
+
+        // depthPose reports a remapped correlation, so 0.5 is *zero* evidence. If this
+        // ever credits a neutral reading, noise starts paying into the confirm score.
+        let neutral = LivenessTuning.default.normalizedEvidence(
+            for: .depthPose, reading: CueReading(level: 0.5, confidence: 1)
+        )
+        precondition(
+            neutral == 0,
+            "FAIL: a zero-correlation depth/pose reading contributed \(neutral) evidence; it must contribute nothing."
+        )
+        print("PASS: a zero-correlation depth/pose reading contributes no confirm evidence.")
     }
 
     // MARK: - Abstention

@@ -200,6 +200,18 @@ struct FaceLabView: View {
 
     // MARK: - Liveness
 
+    private var livenessModeExplanation: String {
+        switch controller.livenessMode {
+        case .light:
+            return "Minimal: only the deny cues run. Anything not actively rejected is treated as live."
+        case .medium:
+            return "Balanced: a deny cue fails the scan; the confirm cues' normalised evidence must "
+                 + "sum to the Medium score before it can pass."
+        case .heavy:
+            return "Strict: a deny cue fails the scan; at least one confirm cue must fully fire before it can pass."
+        }
+    }
+
     /// All five cues, split by role (deny vs. confirm) rather than which checker they live in.
     private var livenessSection: some View {
         GroupBox("Liveness") {
@@ -214,9 +226,7 @@ struct FaceLabView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 220)
 
-                Text(controller.livenessMode == .light
-                     ? "Light: only the deny cues run. Anything not actively rejected is treated as live."
-                     : "Heavy: a deny cue fails the scan; at least one confirm cue must fire before it can pass.")
+                Text(livenessModeExplanation)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
