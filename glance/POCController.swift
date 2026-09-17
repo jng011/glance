@@ -7,11 +7,14 @@
 //
 
 import Foundation
+import os
 import Observation
 
 @Observable
 @MainActor
 final class POCController {
+    nonisolated static let log = Logger(subsystem: "com.jng011.irys", category: "unlock")
+
     var accessibilityGranted: Bool = KeystrokeInjector.isAccessibilityTrusted()
 
     var hasStoredPassword: Bool = SecureCredentialManager.hasStoredPassword()
@@ -90,19 +93,31 @@ final class POCController {
     /// buffer before returning. When `requireAuthoritativeLock` is true (the
     /// auto-trigger path), refuses to inject unless the CGSession dictionary
     /// confirms the screen is actually locked.
+    /// Types the stored password.
+    ///
+    /// Every early return here is logged as well as written to `statusMessage`.
+    /// This is the last step of an unlock and it has four ways to silently do
+    /// nothing, while `statusMessage` only ever appears in a Settings window the
+    /// user cannot see from the lock screen. The observable result of any of them
+    /// is identical — recognition succeeds, the notch resolves, and the Mac stays
+    /// locked — which is indistinguishable from the face not being recognised at
+    /// all, and sends you looking at the recognition threshold instead.
     func injectStoredPassword(requireAuthoritativeLock: Bool = false) async {
         guard KeystrokeInjector.isAccessibilityTrusted() else {
             statusMessage = "Accessibility not granted — open System Settings and enable Irys."
+            Self.log.error("inject aborted: Accessibility not trusted")
             return
         }
         guard SecureCredentialManager.isSessionUnlocked else {
             statusMessage = "Session locked — authenticate with Touch ID first."
+            Self.log.error("inject aborted: session locked, no key cached")
             return
         }
 
         if requireAuthoritativeLock {
             guard LockMonitor.isScreenActuallyLocked() else {
                 statusMessage = "Skipped: CGSession reports screen is not actually locked."
+                Self.log.error("inject aborted: CGSession says the screen is not locked")
                 return
             }
         }
@@ -115,8 +130,10 @@ final class POCController {
                 try KeystrokeInjector.typeAndReturn(bytes)
             }.value
             statusMessage = "Injected stored password + Return at \(Date().formatted(date: .omitted, time: .standard))"
+            Self.log.info("inject: typed stored password")
         } catch {
             statusMessage = "Injection failed: \(error.localizedDescription)"
+            Self.log.error("inject failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }
