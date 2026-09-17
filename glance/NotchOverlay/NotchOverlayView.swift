@@ -79,10 +79,6 @@ struct NotchOverlayView: View {
 
     /// Onboarding always uses the full panel, and `.none` keeps the full expansion too
     /// (it only drops the video) — so this is specifically `.minimal` scan content.
-    private var isRingScan: Bool {
-        onboardingController == nil && controller.activeUnlockStyle == .ring
-    }
-
     private var isMinimalScan: Bool {
         onboardingController == nil && controller.activeUnlockStyle == .minimal
     }
@@ -239,15 +235,6 @@ struct NotchOverlayView: View {
                 pulseScale: scanPulseScale,
                 pulseOpacity: scanPulseOpacity
             )
-        } else if isRingScan {
-            ScanRingView(state: ScanRingState(phase: controller.phase, media: controller.media))
-                .padding(.leading, scanContentPaddingLeading)
-                .padding(.trailing, scanContentPaddingTrailing)
-                .padding(.top, scanContentPaddingTop)
-                .padding(.bottom, scanContentPaddingBottom)
-                // No breathing pulse here: the ring carries its own idle
-                // motion, and stacking the two reads as a wobble.
-                .opacity(scanPulseOpacity)
         } else {
             ScanAnimationView(media: controller.media)
                 .padding(.leading, scanContentPaddingLeading)

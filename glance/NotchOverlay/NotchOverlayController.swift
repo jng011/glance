@@ -87,14 +87,12 @@ final class NotchOverlayController {
     private let successHoldDuration: Duration = .milliseconds(1_700)
     /// Non-private so FaceUnlockCoordinator's auto-retry can wait this out too.
     ///
-    /// Five seconds is the length of the failure *video*, and holding it is the
-    /// single biggest reason a failed attempt feels like a dead end — nothing can
-    /// retry until the clip has finished being looked at. A drawn ring has no clip
-    /// to wait for and keeps sweeping through the failure, so it needs only long
-    /// enough for the tint to register as a distinct event.
-    var failureHoldDuration: Duration {
-        activeUnlockStyle.supportsContinuousProgress ? .milliseconds(900) : .seconds(5)
-    }
+    /// Was 5 seconds, which is the full length of the failure video and the single
+    /// biggest reason a failed attempt feels like a dead end — nothing could retry
+    /// until the clip had finished being looked at. The clip's final frame is a
+    /// resolved state and reads within about a second; the remaining four were dead
+    /// time, not information.
+    let failureHoldDuration: Duration = .milliseconds(1_400)
     /// Reads the same setting as `FaceUnlockCoordinator.scanWindowDuration` so
     /// the two separate timers expire together.
     private var scanTimeoutDuration: Duration {

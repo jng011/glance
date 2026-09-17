@@ -47,8 +47,13 @@ struct IntroStepView: View {
 
 private struct GlanceLogoView: View {
     var body: some View {
-        // Video already bakes in its own white rounded-card background — no extra chrome needed.
-        LoopingVideoView(resourceName: "logoanimation")
+        // Was LoopingVideoView("logoanimation") — the previous app's logo, a blue
+        // rounded square with a smiley face, still playing on the first screen
+        // under the name "Irys". Drawn now; see IrysMarkView.
+        GeometryReader { geo in
+            IrysMarkView(size: min(geo.size.width, geo.size.height))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }
 

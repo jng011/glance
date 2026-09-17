@@ -56,8 +56,11 @@ final class NotchWindowController {
         window.orderFrontRegardless()
 
         if LockMonitor.isScreenActuallyLocked(), let skyLight = NotchSkyLight.shared {
-            skyLight.delegate(window)
-            isSkyLightDelegated = true
+            // Record the delegation only if the window server actually accepted it.
+            // Setting this unconditionally is what let a stale SkyLight space leave
+            // the app permanently believing the notch was on the lock screen when
+            // it was not — see the note at the top of NotchSkyLight.swift.
+            isSkyLightDelegated = skyLight.delegate(window)
         }
         updateCursorPolling()
     }
