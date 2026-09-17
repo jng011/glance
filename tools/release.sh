@@ -37,7 +37,7 @@ echo "==> Building Release"
 xcodebuild -project glance.xcodeproj -scheme glance -configuration Release \
   -destination 'platform=macOS' -derivedDataPath "$BUILD" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" \
-  DEVELOPMENT_TEAM="$TEAM" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+  DEVELOPMENT_TEAM="$TEAM" \
   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   OTHER_CODE_SIGN_FLAGS="--timestamp" build \
   | grep -E "error:|BUILD SUCCEEDED|BUILD FAILED" || true
