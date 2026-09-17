@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.jng011.irys.helper</string>
+	<key>CFBundleName</key>
+	<string>IrysHelper</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<!--
+	  Which clients this daemon accepts, enforced by the system in addition to the
+	  runtime check in main.swift. Belt and braces on purpose: the runtime check is
+	  the one that matters, but a mistake there should not be the only thing
+	  standing between an arbitrary process and a root service.
+	-->
+	<key>SMAuthorizedClients</key>
+	<array>
+		<string>identifier "com.jng011.irys" and anchor apple generic and certificate leaf[subject.OU] = "6TTTJ5468H"</string>
+	</array>
+</dict>
+</plist>

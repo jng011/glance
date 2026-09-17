@@ -124,18 +124,26 @@ enum SecureCredentialManager {
     nonisolated static func unlockSession(reason: String) throws {
         if cachedKey() != nil { return }
 
-        // "Stay unlocked" mode: the key was stored without .userPresence, so it reads
-        // straight back with no prompt. This is the entire feature — after one macOS
-        // login the session is simply never locked again.
-        //
-        // Deliberately falls through to the gated path if the read fails, which is the
-        // case where the setting is on but the key is still stored gated (the toggle
-        // was flipped while the key could not be migrated).
-        if GlanceSettings.staysUnlockedUntilRestartValue,
-           KeychainManager.exists(account: sessionKeyAccount),
-           let data = try? KeychainManager.read(account: sessionKeyAccount, context: nil) {
-            setCachedKey(SymmetricKey(data: data))
-            return
+        // "Stay unlocked" mode. Two mechanisms, tried in order of how well they
+        // protect the key.
+        if GlanceSettings.staysUnlockedUntilRestartValue {
+            // 1. The privileged daemon, when it is registered and answering. The key
+            //    lives in root-owned storage and the daemon only hands it to a caller
+            //    whose code signature matches, so a process merely running as this
+            //    user cannot take it. This is the mechanism to prefer.
+            if let data = HelperClient.storedSessionKey() {
+                setCachedKey(SymmetricKey(data: data))
+                return
+            }
+
+            // 2. Otherwise the key is in the Keychain without its .userPresence gate,
+            //    which reads back with no prompt but is readable by anything running
+            //    as this user. Weaker, and the fallback rather than the design.
+            if KeychainManager.exists(account: sessionKeyAccount),
+               let data = try? KeychainManager.read(account: sessionKeyAccount, context: nil) {
+                setCachedKey(SymmetricKey(data: data))
+                return
+            }
         }
 
         // The existence check, not the read, decides whether a key gets created (load-bearing): a cancelled Touch ID prompt on
@@ -207,7 +215,30 @@ enum SecureCredentialManager {
         guard let key = cachedKey() else { throw SecureCredentialError.sessionKeyUnavailable }
         let material = key.withUnsafeBytes { Data($0) }
 
-        let access = enabled ? nil : try KeychainManager.makeUserPresenceAccessControl()
+        // Prefer the daemon when it is actually answering. Registration status alone
+        // is not enough — a daemon can be registered but awaiting approval in Login
+        // Items, in which case it will not respond and the key must go somewhere the
+        // app can still read it.
+        let usingHelper = enabled && HelperClient.isReachable()
+        if usingHelper {
+            guard HelperClient.storeSessionKey(material) else {
+                throw SecureCredentialError.sessionKeyUnavailable
+            }
+            // The Keychain copy stays Touch-ID-gated. Two protected copies is
+            // strictly better than one unprotected one, and it means disabling the
+            // daemon later falls back to a gated key rather than to nothing.
+        } else if !enabled {
+            // Leaving the feature: clear the daemon's copy so a stale key cannot be
+            // served to anything after the user has asked for the gate back.
+            HelperClient.storeSessionKey(nil)
+        }
+
+        // Ungate the Keychain item only when the daemon is NOT holding the key —
+        // otherwise this would quietly leave a second, unprotected copy behind and
+        // undo the point of using the daemon at all.
+        let access = (enabled && !usingHelper)
+            ? nil
+            : try KeychainManager.makeUserPresenceAccessControl()
         // `save` deletes any existing item for this account before adding, so this is
         // a replace rather than a duplicate.
         try KeychainManager.save(account: sessionKeyAccount, data: material, accessControl: access)

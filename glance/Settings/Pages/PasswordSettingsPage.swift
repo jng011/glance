@@ -102,6 +102,10 @@ struct PasswordSettingsPage: View {
 
                 SettingsGroupDivider()
 
+                HelperInstallRow()
+
+                SettingsGroupDivider()
+
                 SettingsSteppedSliderRowContent(
                     title: "Auto lock session",
                     valueLabel: settings.autoLockInterval.title,
@@ -231,5 +235,110 @@ private struct StayUnlockedRow: View {
                 }
             }
         }
+    }
+}
+
+/// Install / status row for the privileged background helper.
+///
+/// Separate from the "Stay unlocked" toggle because the two are independent: the
+/// toggle asks for the behaviour, this decides how well the key is protected
+/// while providing it. Without the helper the key sits ungated in the Keychain,
+/// readable by anything running as this user; with it, the key lives in
+/// root-owned storage that only a signature-verified caller can read.
+///
+/// One admin authentication, once. macOS verifies that password itself and
+/// discards it — the app never sees it.
+private struct HelperInstallRow: View {
+    @State private var client = HelperClient.shared
+    @State private var isWorking = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SettingsRowContent(
+                title: "Background helper",
+                subtitle: subtitle,
+                subtitleMaxWidth: SettingsMetrics.rowSubtitleMaxWidth
+            ) {
+                trailing
+            }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(GlanceTheme.statusDenied)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SettingsMetrics.rowHorizontalInset)
+                    .padding(.bottom, 8)
+            }
+        }
+        // Approval happens in System Settings, outside this app, so the state here
+        // is stale the moment the user leaves. Re-reading on activation is what
+        // makes the row correct when they come back.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            client.refresh()
+        }
+    }
+
+    private var subtitle: String {
+        switch client.availability {
+        case .enabled:
+            return "Installed. Your session key is held by a root helper that only releases it to Irys."
+        case .requiresApproval:
+            return "Installed, but macOS needs you to switch it on in Login Items."
+        case .notRegistered:
+            return "Not installed. Without it, \"Stay unlocked\" leaves the key readable by any app running as you."
+        case .unavailable(let reason):
+            return reason
+        }
+    }
+
+    @ViewBuilder
+    private var trailing: some View {
+        if isWorking {
+            ProgressView().controlSize(.small)
+        } else {
+            switch client.availability {
+            case .enabled:
+                SettingsPrimaryButton(title: "Remove", compact: true) { remove() }
+            case .requiresApproval:
+                SettingsPrimaryButton(title: "Open Settings", compact: true) {
+                    client.openLoginItemsSettings()
+                }
+            case .notRegistered:
+                SettingsPrimaryButton(title: "Install", compact: true) { install() }
+            case .unavailable:
+                EmptyView()
+            }
+        }
+    }
+
+    private func install() {
+        isWorking = true
+        error = nil
+        do {
+            try client.register()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isWorking = false
+    }
+
+    /// Removing the helper deliberately does NOT re-gate the Keychain key here.
+    ///
+    /// That is the "Stay unlocked" toggle's job, and doing it silently from this
+    /// row would mean a user who removed a background item suddenly started being
+    /// asked for Touch ID again with nothing connecting the two.
+    private func remove() {
+        isWorking = true
+        error = nil
+        do {
+            try client.unregister()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isWorking = false
     }
 }

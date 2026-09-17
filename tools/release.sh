@@ -52,12 +52,27 @@ if ! codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q keychain-ac
   exit 1
 fi
 
+# Both halves of the privileged helper, or "Stay unlocked" silently falls back to
+# the weaker Keychain path with nothing explaining why.
+for required in \
+  "Contents/Library/LaunchServices/com.jng011.irys.helper" \
+  "Contents/Library/LaunchDaemons/com.jng011.irys.helper.plist"
+do
+  [ -e "$APP/$required" ] || { echo "REFUSING: missing $required"; exit 1; }
+done
+
 echo "==> Signing Sparkle's nested helpers"
 # Xcode does not descend into apps and XPC services nested inside a framework,
 # so these keep Sparkle's own signature and fail notarization. Sign inside-out:
 # sealing a container freezes whatever is already inside it.
+# The privileged helper must be signed before the app is sealed around it, for
+# the same reason Sparkle's nested code must: signing a container freezes what is
+# already inside. It also has to carry the same Developer ID, because the daemon
+# only accepts callers matching that team — a helper signed with anything else
+# would refuse the app it shipped with.
 SPK="$APP/Contents/Frameworks/Sparkle.framework"
 for target in \
+  "$APP/Contents/Library/LaunchServices/com.jng011.irys.helper" \
   "$SPK/Versions/B/XPCServices/Downloader.xpc" \
   "$SPK/Versions/B/XPCServices/Installer.xpc" \
   "$SPK/Versions/B/Autoupdate" \

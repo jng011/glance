@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Must match the filename of this plist and irysHelperLabel in the shared
+	     protocol file; SMAppService looks the daemon up by plist name. -->
+	<key>Label</key>
+	<string>com.jng011.irys.helper</string>
+
+	<!-- Path INSIDE the app bundle. SMAppService resolves BundleProgram relative
+	     to the registering app, which is what lets the daemon ship inside the
+	     .app instead of being copied into /Library by an installer. -->
+	<key>BundleProgram</key>
+	<string>Contents/Library/LaunchServices/com.jng011.irys.helper</string>
+
+	<!-- Vending a Mach service is what makes this launch on demand. Without it
+	     launchd would need KeepAlive and the daemon would run permanently for no
+	     reason. -->
+	<key>MachServices</key>
+	<dict>
+		<key>com.jng011.irys.helper</key>
+		<true/>
+	</dict>
+
+	<!-- Ties the daemon to the app in System Settings > Login Items, so the user
+	     sees "Irys" rather than an anonymous background item they are inclined to
+	     switch off. -->
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.jng011.irys</string>
+	</array>
+</dict>
+</plist>

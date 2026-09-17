@@ -7,11 +7,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		08347CF3C3E1B368C9382005 /* com.jng011.irys.helper.plist in Copy LaunchDaemon */ = {isa = PBXBuildFile; fileRef = F18D802B81EAF4EDA5BDC6F7 /* com.jng011.irys.helper.plist */; };
 		17280C29A9398CBFDE0080BF /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 020486DA199A87C9F636359E /* Sparkle */; };
+		AE76AF75EA18BC40CB62B765 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B725A9927097E97A1668203C /* Cocoa.framework */; };
+		B737C940DA188D1ECCDF4AFA /* IrysHelper in Copy Helper */ = {isa = PBXBuildFile; fileRef = 4B48844DC549077D806B5F1A /* IrysHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		CCD33E8A78B99973A9C0F5E1 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 086CB50D771033FAE43D4296 /* main.swift */; };
+		CD96A61D9CC070E5A927C910 /* IrysHelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA4526AF25079A76CAFD8CD /* IrysHelperProtocol.swift */; };
+		F8A00BECC9A075CA1053F408 /* IrysHelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA4526AF25079A76CAFD8CD /* IrysHelperProtocol.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A2656F6F6D561EF7813F125F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 601C4934300FFC8400D3DE9D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C3910FF3EBD1E8A35CBF9E71;
+			remoteInfo = IrysHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		495CEA0E3B24AF2EB140DBF6 /* Copy LaunchDaemon */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				08347CF3C3E1B368C9382005 /* com.jng011.irys.helper.plist in Copy LaunchDaemon */,
+			);
+			name = "Copy LaunchDaemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65C49A84D9069FBD1C67E7EC /* Copy Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchServices;
+			dstSubfolderSpec = 1;
+			files = (
+				B737C940DA188D1ECCDF4AFA /* IrysHelper in Copy Helper */,
+			);
+			name = "Copy Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		086CB50D771033FAE43D4296 /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		4B48844DC549077D806B5F1A /* IrysHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = IrysHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		601C493C300FFC8400D3DE9D /* glance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = glance.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B725A9927097E97A1668203C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		CBA4526AF25079A76CAFD8CD /* IrysHelperProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IrysHelperProtocol.swift; sourceTree = "<group>"; };
+		E4535A5AF43CEAFC3D90EE5E /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F18D802B81EAF4EDA5BDC6F7 /* com.jng011.irys.helper.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = com.jng011.irys.helper.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,6 +83,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0B9EB2AA0F3396A25881E9B4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE76AF75EA18BC40CB62B765 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		601C4939300FFC8400D3DE9D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -52,6 +107,8 @@
 			children = (
 				601C493E300FFC8400D3DE9D /* glance */,
 				601C493D300FFC8400D3DE9D /* Products */,
+				76CCA87CBBA73E987AAB2236 /* Frameworks */,
+				C4A5849A6A20D072FC611F99 /* IrysHelper */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,8 +116,37 @@
 			isa = PBXGroup;
 			children = (
 				601C493C300FFC8400D3DE9D /* glance.app */,
+				4B48844DC549077D806B5F1A /* IrysHelper */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		76CCA87CBBA73E987AAB2236 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BB4235CB97A94A2A624C1CE5 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		BB4235CB97A94A2A624C1CE5 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				B725A9927097E97A1668203C /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		C4A5849A6A20D072FC611F99 /* IrysHelper */ = {
+			isa = PBXGroup;
+			children = (
+				086CB50D771033FAE43D4296 /* main.swift */,
+				CBA4526AF25079A76CAFD8CD /* IrysHelperProtocol.swift */,
+				E4535A5AF43CEAFC3D90EE5E /* Info.plist */,
+				F18D802B81EAF4EDA5BDC6F7 /* com.jng011.irys.helper.plist */,
+			);
+			name = IrysHelper;
+			path = IrysHelper;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -73,10 +159,13 @@
 				601C4938300FFC8400D3DE9D /* Sources */,
 				601C4939300FFC8400D3DE9D /* Frameworks */,
 				601C493A300FFC8400D3DE9D /* Resources */,
+				65C49A84D9069FBD1C67E7EC /* Copy Helper */,
+				495CEA0E3B24AF2EB140DBF6 /* Copy LaunchDaemon */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8C5B8EF9DE5060C9D8A52AF6 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				601C493E300FFC8400D3DE9D /* glance */,
@@ -88,6 +177,22 @@
 			productName = glance;
 			productReference = 601C493C300FFC8400D3DE9D /* glance.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C3910FF3EBD1E8A35CBF9E71 /* IrysHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A40DC8EA3965740674C6D4A /* Build configuration list for PBXNativeTarget "IrysHelper" */;
+			buildPhases = (
+				A3377A6D7021BD0493B2336A /* Sources */,
+				0B9EB2AA0F3396A25881E9B4 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IrysHelper;
+			productName = IrysHelper;
+			productReference = 4B48844DC549077D806B5F1A /* IrysHelper */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -122,6 +227,7 @@
 			projectRoot = "";
 			targets = (
 				601C493B300FFC8400D3DE9D /* glance */,
+				C3910FF3EBD1E8A35CBF9E71 /* IrysHelper */,
 			);
 		};
 /* End PBXProject section */
@@ -141,12 +247,67 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CD96A61D9CC070E5A927C910 /* IrysHelperProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3377A6D7021BD0493B2336A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CCD33E8A78B99973A9C0F5E1 /* main.swift in Sources */,
+				F8A00BECC9A075CA1053F408 /* IrysHelperProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8C5B8EF9DE5060C9D8A52AF6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = IrysHelper;
+			target = C3910FF3EBD1E8A35CBF9E71 /* IrysHelper */;
+			targetProxy = A2656F6F6D561EF7813F125F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		05C7F1E01081294A80F6C79F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = 6TTTJ5468H;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = IrysHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jng011.irys.helper;
+				PRODUCT_NAME = com.jng011.irys.helper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		38656104908C3F32D22F819E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = 6TTTJ5468H;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = IrysHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jng011.irys.helper;
+				PRODUCT_NAME = com.jng011.irys.helper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
 		601C4945300FFC8500D3DE9D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -342,6 +503,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0A40DC8EA3965740674C6D4A /* Build configuration list for PBXNativeTarget "IrysHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				05C7F1E01081294A80F6C79F /* Release */,
+				38656104908C3F32D22F819E /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		601C4937300FFC8400D3DE9D /* Build configuration list for PBXProject "glance" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
