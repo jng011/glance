@@ -377,8 +377,19 @@ final class OnboardingController {
     private let stallTimeout: Duration = .seconds(12)
     private let stallWidenFactor: Float = 1.25
 
-    private(set) var currentPoseIndex = 0
-    private(set) var capturedForCurrentPose = 0
+    /// Samples captured per pose. Replaces the old `currentPoseIndex` /
+    /// `capturedForCurrentPose` pair, which only made sense while the poses were
+    /// walked in a fixed order.
+    ///
+    /// Enrollment no longer marches the user through nine prompts ("look top
+    /// left", "look top right", ...) and refuse anything else. It accepts whichever
+    /// pose the head is actually in and fills that bin, so the user rotates once and
+    /// coverage accumulates wherever they happen to look — which is what iPhone Face
+    /// ID enrollment does, and what the old flow made needlessly laborious.
+    private(set) var poseSampleCounts: [EnrollmentPose: Int] = [:]
+    /// Which pose the last accepted frame fell into, so the hold timer resets when the
+    /// head crosses from one bin into another.
+    private var holdingPose: EnrollmentPose?
     private(set) var faceDetected = false
     private(set) var currentYaw: Float?
     private(set) var currentPitch: Float?
@@ -426,8 +437,27 @@ final class OnboardingController {
     /// Capture waits `poseHoldDuration` past this instant.
     private var poseHoldStartedAt: ContinuousClock.Instant?
 
+    /// The next pose still needing samples. Only a *hint* now — it drives the
+    /// direction sweep so there is something to aim at, but capture is no longer
+    /// gated on reaching it. Any uncaptured pose the head lands in will be taken.
     var currentPose: EnrollmentPose? {
-        EnrollmentPose(rawValue: currentPoseIndex)
+        EnrollmentPose.allCases.first { samplesNeeded(for: $0) > 0 }
+    }
+
+    private func samplesNeeded(for pose: EnrollmentPose) -> Int {
+        max(0, samplesPerPose - (poseSampleCounts[pose] ?? 0))
+    }
+
+    /// Which uncaptured pose this head orientation falls into, if any.
+    ///
+    /// Ordered by `allCases`, and the bands can overlap slightly at the corners, so
+    /// a head between two bins fills whichever comes first — either is a legitimate
+    /// sample of that region, and preferring one deterministically avoids flapping
+    /// between them frame to frame.
+    private func matchingUncapturedPose(yaw: Float, pitch: Float, widened: Bool) -> EnrollmentPose? {
+        EnrollmentPose.allCases.first { pose in
+            samplesNeeded(for: pose) > 0 && poseMatches(yaw: yaw, pitch: pitch, pose: pose, widened: widened)
+        }
     }
 
     /// Copy shown under the camera: pose guidance, a closer-up prompt, or the
@@ -435,7 +465,9 @@ final class OnboardingController {
     var enrollmentInstruction: String {
         if enrollmentComplete { return "Face captured" }
         if isTooFar { return "Bring your face closer" }
-        return currentPose?.instruction ?? ""
+        // One instruction for the whole flow. The per-pose prompts existed only
+        // because capture demanded a specific pose next; nothing demands that now.
+        return "Slowly turn your head in a circle"
     }
 
     /// Where the head is currently turned, for the ring's live indicator.
@@ -475,7 +507,7 @@ final class OnboardingController {
 
     var overallEnrollmentProgress: Double {
         let total = Double(EnrollmentPose.allCases.count * samplesPerPose)
-        let done = Double(currentPoseIndex * samplesPerPose + capturedForCurrentPose)
+        let done = Double(poseSampleCounts.values.reduce(0, +))
         return min(done / total, 1.0)
     }
 
@@ -608,8 +640,8 @@ final class OnboardingController {
     private func resetEnrollmentState() {
         collectedSamples = []
         nameError = nil
-        currentPoseIndex = 0
-        capturedForCurrentPose = 0
+        poseSampleCounts = [:]
+        holdingPose = nil
         capturedPoses = []
         matchStreak = 0
         poseHoldStartedAt = nil
@@ -773,7 +805,7 @@ final class OnboardingController {
 
     private func processEnrollFrame() async {
         guard step == .enroll, !enrollmentComplete, !isProcessingFrame,
-              let cameraFrame = camera.currentFrame, let pose = currentPose else { return }
+              let cameraFrame = camera.currentFrame else { return }
         isProcessingFrame = true
         defer { isProcessingFrame = false }
 
@@ -826,21 +858,21 @@ final class OnboardingController {
             currentYaw = yaw
             currentPitch = pitch
             isTooFar = false
-            await processMatchedEnrollFrame(result, yaw: yaw, pitch: pitch, pose: pose)
+            await processMatchedEnrollFrame(result, yaw: yaw, pitch: pitch)
         }
     }
 
     private func processMatchedEnrollFrame(
         _ result: FaceRecognitionResult,
         yaw: Float,
-        pitch: Float,
-        pose: EnrollmentPose
+        pitch: Float
     ) async {
 
         // Detection above still ran; only capture is held back until settled.
         guard ContinuousClock.now >= captureReadyAt else {
             matchStreak = 0
             poseHoldStartedAt = nil
+            holdingPose = nil
             return
         }
 
@@ -848,11 +880,25 @@ final class OnboardingController {
         // Only a 5-point alignment is reliably canonical; a 2-point/padded-crop fallback
         // isn't accepted toward enrollment.
         let alignmentOK = result.alignmentTier == .fivePoint
+        // Widening is now measured from the last successful capture rather than from
+        // the start of a specific pose, since there is no per-pose clock any more. It
+        // still does the same job: stop an unusual camera angle stranding the user.
         let widened = ContinuousClock.now - poseStartedAt > stallTimeout
-        let poseOK = poseMatches(yaw: yaw, pitch: pitch, pose: pose, widened: widened)
-        guard qualityOK, alignmentOK, !isTooFar, poseOK else {
+
+        guard qualityOK, alignmentOK, !isTooFar,
+              let pose = matchingUncapturedPose(yaw: yaw, pitch: pitch, widened: widened) else {
             matchStreak = 0
             poseHoldStartedAt = nil
+            holdingPose = nil
+            return
+        }
+
+        // Crossing from one bin into another restarts the hold, so a sample is never
+        // taken from a head that is still travelling between poses.
+        if holdingPose != pose {
+            holdingPose = pose
+            poseHoldStartedAt = .now
+            matchStreak = 0
             return
         }
 
@@ -871,19 +917,20 @@ final class OnboardingController {
             quality: result.quality,
             capturedAt: Date()
         ))
-        capturedForCurrentPose += 1
+        poseSampleCounts[pose, default: 0] += 1
+        poseStartedAt = .now
 
-        if capturedForCurrentPose >= samplesPerPose {
+        if samplesNeeded(for: pose) == 0 {
             if pose == .center {
                 centerPulseTick += 1
             } else {
+                // Lights this sector's ticks in EnrollmentRingView. Unchanged
+                // semantics — center still has no sector of its own.
                 capturedPoses.insert(pose)
             }
-            currentPoseIndex += 1
-            capturedForCurrentPose = 0
-            poseStartedAt = .now
             poseHoldStartedAt = nil
-            if currentPoseIndex >= EnrollmentPose.allCases.count {
+            holdingPose = nil
+            if EnrollmentPose.allCases.allSatisfy({ samplesNeeded(for: $0) == 0 }) {
                 await finishEnrollment()
             }
         }

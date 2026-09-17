@@ -119,6 +119,17 @@ struct SecurityNoticeStepView: View {
                 .foregroundStyle(GlanceTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 4)
+
+            // Said here, once, in plain terms. The liveness strength setting is the
+            // only control in the app that can hand someone else the Mac, and
+            // burying that until a user happens to open Settings would be the
+            // dishonest choice. Naming the default is the point: it is what almost
+            // everyone will actually run.
+            Text("Irys checks that it's a real face and not a photo. Its **Balanced** default refuses a printed photo. The **Minimal** setting does not — a printed photo of you will unlock your Mac. You'll be warned before switching to it.")
+                .font(GlanceTheme.Font.passwordCaption)
+                .foregroundStyle(GlanceTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 4)
                 .padding(.bottom, 10)
 
             HStack(spacing: 10) {

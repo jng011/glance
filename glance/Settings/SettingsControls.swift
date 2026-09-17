@@ -796,27 +796,93 @@ struct LivenessModePicker: View {
     @Binding var selection: LivenessMode
     var isEnabled: Bool = true
 
+    /// A weaker-than-recommended mode the user has tapped but not yet confirmed.
+    /// Held rather than applied so the warning is a decision point, not a notice
+    /// about something that already happened.
+    @State private var pendingDowngrade: LivenessMode?
+
     var body: some View {
-        SettingsLabeledOptionRow(
-            title: "Strength",
-            subtitle: "Balanced is recommended. Strict requires you to blink or clearly turn your head."
-        ) {
-            ForEach(LivenessMode.allCases) { mode in
-                SettingsOptionTile(
-                    title: mode.title,
-                    isSelected: selection == mode,
-                    action: { selection = mode },
-                    previewHeight: SettingsMetrics.triggerOptionPreviewSize.height,
-                    previewWidth: SettingsMetrics.triggerOptionPreviewSize.width
-                ) {
-                    Image(systemName: iconName(for: mode))
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(SettingsOptionTile<EmptyView>.previewTint(isSelected: selection == mode))
+        VStack(alignment: .leading, spacing: 10) {
+            SettingsLabeledOptionRow(
+                title: "Strength",
+                subtitle: "Balanced is recommended. Strict requires you to blink or clearly turn your head."
+            ) {
+                ForEach(LivenessMode.allCases) { mode in
+                    SettingsOptionTile(
+                        title: mode.title,
+                        isSelected: selection == mode,
+                        action: { select(mode) },
+                        previewHeight: SettingsMetrics.triggerOptionPreviewSize.height,
+                        previewWidth: SettingsMetrics.triggerOptionPreviewSize.width
+                    ) {
+                        Image(systemName: iconName(for: mode))
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(SettingsOptionTile<EmptyView>.previewTint(isSelected: selection == mode))
+                    }
                 }
             }
+
+            if let pending = pendingDowngrade, let warning = pending.downgradeWarning {
+                downgradeConfirmation(for: pending, warning: warning)
+            }
         }
+        .animation(.easeInOut(duration: 0.22), value: pendingDowngrade)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
+    }
+
+    /// Weakening the check is the one setting in this app that can hand someone
+    /// else the Mac, so it asks first. Anything at or above the recommended
+    /// level applies immediately — a confirmation on a safe choice trains people
+    /// to click through the one that matters.
+    private func select(_ mode: LivenessMode) {
+        guard mode != selection else { return }
+        if mode.isWeakerThanRecommended {
+            pendingDowngrade = mode
+        } else {
+            pendingDowngrade = nil
+            selection = mode
+        }
+    }
+
+    /// Deliberately inline rather than a modal alert. A sheet that blocks the
+    /// window reads as the app protesting; the point is to state a fact and let
+    /// the user decide, next to the control they just touched.
+    @ViewBuilder
+    private func downgradeConfirmation(for mode: LivenessMode, warning: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                // Amber, not red: this is a real consequence the user may still
+                // legitimately choose, not an error they have made.
+                .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.30))
+                .font(.system(size: 13))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(warning)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    Button("Cancel") { pendingDowngrade = nil }
+                        .controlSize(.small)
+                    // Names the outcome rather than saying "OK", so the button
+                    // still makes sense to someone who skipped the sentence above.
+                    Button("Use \(mode.title) anyway") {
+                        selection = mode
+                        pendingDowngrade = nil
+                    }
+                    .controlSize(.small)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     /// Brightness ramp as a stand-in for scrutiny: Minimal only screens *out* spoofs,
