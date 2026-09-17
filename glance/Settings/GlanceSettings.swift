@@ -38,6 +38,11 @@ enum UnlockAnimationStyle: String, CaseIterable, Identifiable {
     case none
     case minimal
     case original
+    /// Drawn rather than played. The pre-rendered styles cannot show an attempt
+    /// in progress — a clip has a fixed duration, so a failure can only play out
+    /// and stop, which is why those styles dead-end on "hover the notch to try
+    /// again". See `ScanRingView`.
+    case ring
 
     var id: String { rawValue }
 
@@ -46,11 +51,17 @@ enum UnlockAnimationStyle: String, CaseIterable, Identifiable {
         case .none: return "None"
         case .minimal: return "Minimal"
         case .original: return "Original"
+        case .ring: return "Ring"
         }
     }
 
     /// The styles the picker offers; `.none` is still a valid stored value but is now produced by the "Show animation" toggle, not a tile.
-    static let selectableCases: [UnlockAnimationStyle] = [.minimal, .original]
+    static let selectableCases: [UnlockAnimationStyle] = [.ring, .minimal, .original]
+
+    /// Whether this style can keep indicating progress indefinitely. The video
+    /// styles cannot, so the overlay has to hold their final frame for the
+    /// clip's length before anything else can happen.
+    var supportsContinuousProgress: Bool { self == .ring }
 }
 
 /// What can prompt Face Unlock. Multi-select; at least one is always kept
@@ -279,7 +290,10 @@ final class GlanceSettings {
             // Migrate the oldest on/off toggle: off → none, on → original.
             storedStyle = legacy ? .original : .none
         } else {
-            storedStyle = .original
+            // Fresh install: the ring, not the video. It is the only style that
+            // can show an attempt still in progress. An existing explicit choice
+            // is untouched by this — only the no-stored-value case changes.
+            storedStyle = .ring
         }
         // A stored `.none` becomes "off, remembering .original" so
         // switching back on has something to restore.

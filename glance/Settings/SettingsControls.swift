@@ -750,6 +750,25 @@ struct UnlockAnimationPicker: View {
             .background(Color.black, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
             .frame(width: 50, height: 50)
             .padding(.vertical, 10)
+        case .ring:
+            // A static three-quarter arc rather than the live ScanRingView: a
+            // spinning tile in a settings picker draws the eye away from the
+            // choice being made, and the mark reads fine at rest.
+            VStack {
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.16), lineWidth: 2.5)
+                    Circle()
+                        .trim(from: 0, to: 0.30)
+                        .stroke(Color.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                .padding(11)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Color.black, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .frame(width: 50, height: 50)
+            .padding(.vertical, 10)
         case .none:
             EmptyView()
         }
